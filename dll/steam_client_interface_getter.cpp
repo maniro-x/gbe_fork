@@ -1055,6 +1055,10 @@ ISteamInput *Steam_Client::GetISteamInput( HSteamUser hSteamUser, HSteamPipe hSt
         auto out = reinterpret_cast<ISteamInput *>(static_cast<ISteamInput006 *>(steam_controller));
         PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
         return out;
+    } else if (strcmp(pchVersion, "SteamInput007") == 0) {
+        auto out = reinterpret_cast<ISteamInput *>(static_cast<ISteamInput *>(steam_controller));
+        PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
+        return out;
     } else if (strcmp(pchVersion, STEAMINPUT_INTERFACE_VERSION) == 0) {
         auto out = reinterpret_cast<ISteamInput *>(static_cast<ISteamInput *>(steam_controller));
         PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
