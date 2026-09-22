@@ -405,7 +405,8 @@ static bool load_controller_mappings_from_vdf(
     const VdfEntry &controller_mappings,
     Action_Set_Map &action_sets,
     std::map<std::string, std::string> &action_set_layer_parents,
-    Action_Set_Map &action_set_layers
+    Action_Set_Map &action_set_layers,
+    std::string &default_action_set_name
 )
 {
     static const std::map<std::string, std::string> keymap_digital = {
@@ -499,6 +500,9 @@ static bool load_controller_mappings_from_vdf(
 
         Action_Set_Map &target_maps = is_action_layer ? action_set_layers : action_sets;
         const std::string target_name = preset_name_upper;
+        if (!is_action_layer && default_action_set_name.empty()) {
+            default_action_set_name = target_name;
+        }
 
         if (is_action_layer) {
             std::string parent_name = get_first_string_ci(preset, "parent_set_name");
@@ -607,7 +611,8 @@ static bool load_controller_mappings_vdf_file(
     const std::filesystem::path &config_path,
     Action_Set_Map &action_sets,
     std::map<std::string, std::string> &action_set_layer_parents,
-    Action_Set_Map &action_set_layers
+    Action_Set_Map &action_set_layers,
+    std::string &default_action_set_name
 )
 {
     VdfEntry root{};
@@ -624,14 +629,15 @@ static bool load_controller_mappings_vdf_file(
     }
 
     if (!controller_mappings) return false;
-    return load_controller_mappings_from_vdf(*controller_mappings, action_sets, action_set_layer_parents, action_set_layers);
+    return load_controller_mappings_from_vdf(*controller_mappings, action_sets, action_set_layer_parents, action_set_layers, default_action_set_name);
 }
 
 static bool load_action_manifest_vdf(
     const std::filesystem::path &manifest_path,
     Action_Set_Map &action_sets,
     std::map<std::string, std::string> &action_set_layer_parents,
-    Action_Set_Map &action_set_layers
+    Action_Set_Map &action_set_layers,
+    std::string &default_action_set_name
 )
 {
     VdfEntry root{};
@@ -642,7 +648,7 @@ static bool load_action_manifest_vdf(
 
     if (has_child_ci(*manifest_root, "controller_mappings")) {
         auto controller_mappings = find_first_child_ci(*manifest_root, "controller_mappings");
-        return controller_mappings && load_controller_mappings_from_vdf(*controller_mappings, action_sets, action_set_layer_parents, action_set_layers);
+        return controller_mappings && load_controller_mappings_from_vdf(*controller_mappings, action_sets, action_set_layer_parents, action_set_layers, default_action_set_name);
     }
 
     auto configurations = find_first_child_ci(*manifest_root, "configurations");
@@ -671,7 +677,7 @@ static bool load_action_manifest_vdf(
 
                 auto config_path = resolve_vdf_path(manifest_path.parent_path(), path_string);
                 if (config_path.empty()) continue;
-                if (load_controller_mappings_vdf_file(config_path, action_sets, action_set_layer_parents, action_set_layers)) {
+                if (load_controller_mappings_vdf_file(config_path, action_sets, action_set_layer_parents, action_set_layers, default_action_set_name)) {
                     return true;
                 }
             }
@@ -903,6 +909,11 @@ void Steam_Controller::set_handles()
 
 ControllerActionSetHandle_t Steam_Controller::get_default_action_set_handle() const
 {
+    auto default_action_handle = action_handles.find(default_action_set_name);
+    if (default_action_handle != action_handles.end() && !action_set_layer_parents.count(default_action_handle->second)) {
+        return default_action_handle->second;
+    }
+
     for (auto &action_handle : action_handles) {
         if (!action_set_layer_parents.count(action_handle.second)) {
             return action_handle.second;
@@ -912,12 +923,33 @@ ControllerActionSetHandle_t Steam_Controller::get_default_action_set_handle() co
     return 0;
 }
 
-void Steam_Controller::refresh_controllers()
+std::string Steam_Controller::get_action_set_name_for_handle(ControllerActionSetHandle_t handle) const
+{
+    for (auto &action_handle : action_handles) {
+        if (action_handle.second == handle) {
+            return action_handle.first;
+        }
+    }
+
+    return {};
+}
+
+void Steam_Controller::refresh_controllers(const std::map<ControllerHandle_t, std::string> &previous_action_sets)
 {
     const ControllerActionSetHandle_t default_action_set = get_default_action_set_handle();
     for (auto &controller : controllers) {
         controller.second.deactivate_all_action_set_layers(controller_maps, action_set_layer_parents);
-        controller.second.activate_action_set(default_action_set, controller_maps, action_set_layer_parents);
+
+        ControllerActionSetHandle_t action_set_to_activate = default_action_set;
+        auto previous_action_set = previous_action_sets.find(controller.first);
+        if (previous_action_set != previous_action_sets.end()) {
+            auto current_action_set = action_handles.find(previous_action_set->second);
+            if (current_action_set != action_handles.end() && !action_set_layer_parents.count(current_action_set->second)) {
+                action_set_to_activate = current_action_set->second;
+            }
+        }
+
+        controller.second.activate_action_set(action_set_to_activate, controller_maps, action_set_layer_parents);
     }
 }
 
@@ -1028,19 +1060,26 @@ bool Steam_Controller::Init( const char *pchAbsolutePathToControllerConfigVDF )
     if (pchAbsolutePathToControllerConfigVDF) {
         std::lock_guard<std::recursive_mutex> lock(global_mutex);
 
+        std::map<ControllerHandle_t, std::string> previous_action_sets{};
+        for (auto &controller : controllers) {
+            previous_action_sets[controller.first] = get_action_set_name_for_handle(controller.second.active_set);
+        }
+
         Action_Set_Map action_sets =
             settings->controller_settings.action_sets;
         std::map<std::string, std::string> action_set_layer_parents =
             settings->controller_settings.action_set_layer_parents;
         Action_Set_Map action_set_layers =
             settings->controller_settings.action_set_layers;
-        if (load_controller_mappings_vdf_file(std::filesystem::u8path(pchAbsolutePathToControllerConfigVDF), action_sets, action_set_layer_parents, action_set_layers)) {
+        std::string default_action_set_name{};
+        if (load_controller_mappings_vdf_file(std::filesystem::u8path(pchAbsolutePathToControllerConfigVDF), action_sets, action_set_layer_parents, action_set_layers, default_action_set_name)) {
             settings->controller_settings.action_sets = std::move(action_sets);
             settings->controller_settings.action_set_layer_parents = std::move(action_set_layer_parents);
             settings->controller_settings.action_set_layers = std::move(action_set_layers);
+            this->default_action_set_name = std::move(default_action_set_name);
             set_handles();
             disabled = !settings->controller_settings.enabled && action_handles.empty();
-            refresh_controllers();
+            refresh_controllers(previous_action_sets);
         }
     }
 
@@ -1090,22 +1129,29 @@ bool Steam_Controller::SetInputActionManifestFilePath( const char *pchInputActio
 
     std::lock_guard<std::recursive_mutex> lock(global_mutex);
 
+    std::map<ControllerHandle_t, std::string> previous_action_sets{};
+    for (auto &controller : controllers) {
+        previous_action_sets[controller.first] = get_action_set_name_for_handle(controller.second.active_set);
+    }
+
     Action_Set_Map action_sets =
         settings->controller_settings.action_sets;
     std::map<std::string, std::string> action_set_layer_parents =
         settings->controller_settings.action_set_layer_parents;
     Action_Set_Map action_set_layers =
         settings->controller_settings.action_set_layers;
-    if (!load_action_manifest_vdf(std::filesystem::u8path(pchInputActionManifestAbsolutePath), action_sets, action_set_layer_parents, action_set_layers)) {
+    std::string default_action_set_name{};
+    if (!load_action_manifest_vdf(std::filesystem::u8path(pchInputActionManifestAbsolutePath), action_sets, action_set_layer_parents, action_set_layers, default_action_set_name)) {
         return false;
     }
 
     settings->controller_settings.action_sets = std::move(action_sets);
     settings->controller_settings.action_set_layer_parents = std::move(action_set_layer_parents);
     settings->controller_settings.action_set_layers = std::move(action_set_layers);
+    this->default_action_set_name = std::move(default_action_set_name);
     set_handles();
     disabled = !settings->controller_settings.enabled && action_handles.empty();
-    refresh_controllers();
+    refresh_controllers(previous_action_sets);
 
     if (!disabled && !initialized) {
         return Init(explicitly_call_run_frame);
