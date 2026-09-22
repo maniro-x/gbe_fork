@@ -815,6 +815,27 @@ static void debug_log_raw_gamepad_state(const char *context, ControllerHandle_t 
     PRINT_DEBUG("%s controller %llu raw_state %s", context, controllerHandle, snapshot.c_str());
 }
 
+static void debug_log_action_snapshot(
+    const char *context,
+    ControllerHandle_t controllerHandle,
+    uint64 actionHandle,
+    const std::string &snapshot
+)
+{
+    const std::string key =
+        std::string(context) + ":" +
+        std::to_string(controllerHandle) + ":" +
+        std::to_string(actionHandle);
+    static std::map<std::string, std::string> previous_snapshots{};
+    auto previous = previous_snapshots.find(key);
+    if (previous != previous_snapshots.end() && previous->second == snapshot) {
+        return;
+    }
+
+    previous_snapshots[key] = snapshot;
+    PRINT_DEBUG("%s", snapshot.c_str());
+}
+
 } // namespace
 
 
@@ -1429,10 +1450,30 @@ int Steam_Controller::GetConnectedControllers( ControllerHandle_t *handlesOut )
     }
 
     int count = 0;
-    if (GamepadIsConnected(GAMEPAD_0)) {*handlesOut = GAMEPAD_0 + 1; debug_log_raw_gamepad_state("GetConnectedControllers", *handlesOut); ++handlesOut; ++count;};
-    if (GamepadIsConnected(GAMEPAD_1)) {*handlesOut = GAMEPAD_1 + 1; debug_log_raw_gamepad_state("GetConnectedControllers", *handlesOut); ++handlesOut; ++count;};
-    if (GamepadIsConnected(GAMEPAD_2)) {*handlesOut = GAMEPAD_2 + 1; debug_log_raw_gamepad_state("GetConnectedControllers", *handlesOut); ++handlesOut; ++count;};
-    if (GamepadIsConnected(GAMEPAD_3)) {*handlesOut = GAMEPAD_3 + 1; debug_log_raw_gamepad_state("GetConnectedControllers", *handlesOut); ++handlesOut; ++count;};
+    if (GamepadIsConnected(GAMEPAD_0)) {
+        *handlesOut = GAMEPAD_0 + 1;
+        debug_log_raw_gamepad_state("GetConnectedControllers", *handlesOut);
+        ++handlesOut;
+        ++count;
+    }
+    if (GamepadIsConnected(GAMEPAD_1)) {
+        *handlesOut = GAMEPAD_1 + 1;
+        debug_log_raw_gamepad_state("GetConnectedControllers", *handlesOut);
+        ++handlesOut;
+        ++count;
+    }
+    if (GamepadIsConnected(GAMEPAD_2)) {
+        *handlesOut = GAMEPAD_2 + 1;
+        debug_log_raw_gamepad_state("GetConnectedControllers", *handlesOut);
+        ++handlesOut;
+        ++count;
+    }
+    if (GamepadIsConnected(GAMEPAD_3)) {
+        *handlesOut = GAMEPAD_3 + 1;
+        debug_log_raw_gamepad_state("GetConnectedControllers", *handlesOut);
+        ++handlesOut;
+        ++count;
+    }
 
     PRINT_DEBUG("returned %i connected controllers", count);
     return count;
@@ -1639,17 +1680,25 @@ ControllerDigitalActionData_t Steam_Controller::GetDigitalActionData( Controller
 
     auto controller = controllers.find(controllerHandle);
     if (controller == controllers.end()) {
-        PRINT_DEBUG("controller %llu missing while reading digital handle %llu", controllerHandle, digitalActionHandle);
+        debug_log_action_snapshot(
+            "GetDigitalActionData",
+            controllerHandle,
+            digitalActionHandle,
+            "controller " + std::to_string(controllerHandle) +
+                " missing while reading digital handle " + std::to_string(digitalActionHandle)
+        );
         return digitalData;
     }
 
     std::set<int> buttons = controller->second.button_id(digitalActionHandle);
     if (!buttons.size()) {
-        PRINT_DEBUG(
-            "digital handle %llu not mapped in active set '%s' on controller %llu",
+        debug_log_action_snapshot(
+            "GetDigitalActionData",
+            controllerHandle,
             digitalActionHandle,
-            get_action_set_name_for_handle(controller->second.active_set).c_str(),
-            controllerHandle
+            "digital handle " + std::to_string(digitalActionHandle) +
+                " not mapped in active set '" + get_action_set_name_for_handle(controller->second.active_set) +
+                "' on controller " + std::to_string(controllerHandle)
         );
         return digitalData;
     }
@@ -1709,14 +1758,16 @@ ControllerDigitalActionData_t Steam_Controller::GetDigitalActionData( Controller
         }
     }
 
-    PRINT_DEBUG(
-        "digital handle %llu controller %llu active_set '%s' bindings=[%s] active=%i state=%i",
-        digitalActionHandle,
+    debug_log_action_snapshot(
+        "GetDigitalActionData",
         controllerHandle,
-        get_action_set_name_for_handle(controller->second.active_set).c_str(),
-        debug_describe_binding_set(buttons).c_str(),
-        digitalData.bActive,
-        digitalData.bState
+        digitalActionHandle,
+        "digital handle " + std::to_string(digitalActionHandle) +
+            " controller " + std::to_string(controllerHandle) +
+            " active_set '" + get_action_set_name_for_handle(controller->second.active_set) +
+            "' bindings=[" + debug_describe_binding_set(buttons) +
+            "] active=" + std::to_string(digitalData.bActive) +
+            " state=" + std::to_string(digitalData.bState)
     );
     return digitalData;
 }
@@ -1877,17 +1928,25 @@ ControllerAnalogActionData_t Steam_Controller::GetAnalogActionData( ControllerHa
 
     auto controller = controllers.find(controllerHandle);
     if (controller == controllers.end()) {
-        PRINT_DEBUG("controller %llu missing while reading analog handle %llu", controllerHandle, analogActionHandle);
+        debug_log_action_snapshot(
+            "GetAnalogActionData",
+            controllerHandle,
+            analogActionHandle,
+            "controller " + std::to_string(controllerHandle) +
+                " missing while reading analog handle " + std::to_string(analogActionHandle)
+        );
         return data;
     }
 
     auto analog = controller->second.analog_id(analogActionHandle);
     if (!analog.first.size()) {
-        PRINT_DEBUG(
-            "analog handle %llu not mapped in active set '%s' on controller %llu",
+        debug_log_action_snapshot(
+            "GetAnalogActionData",
+            controllerHandle,
             analogActionHandle,
-            get_action_set_name_for_handle(controller->second.active_set).c_str(),
-            controllerHandle
+            "analog handle " + std::to_string(analogActionHandle) +
+                " not mapped in active set '" + get_action_set_name_for_handle(controller->second.active_set) +
+                "' on controller " + std::to_string(controllerHandle)
         );
         return data;
     }
@@ -1924,7 +1983,10 @@ ControllerAnalogActionData_t Steam_Controller::GetAnalogActionData( ControllerHa
         }
     }
 
-    PRINT_DEBUG(
+    char analog_snapshot[512];
+    snprintf(
+        analog_snapshot,
+        sizeof(analog_snapshot),
         "analog handle %llu controller %llu active_set '%s' mode=%s bindings=[%s] active=%i x=%.3f y=%.3f",
         analogActionHandle,
         controllerHandle,
@@ -1934,6 +1996,12 @@ ControllerAnalogActionData_t Steam_Controller::GetAnalogActionData( ControllerHa
         data.bActive,
         data.x,
         data.y
+    );
+    debug_log_action_snapshot(
+        "GetAnalogActionData",
+        controllerHandle,
+        analogActionHandle,
+        analog_snapshot
     );
     return data;
 }
