@@ -726,6 +726,7 @@ void Controller_Action::activate_action_set(
 )
 {
     this->active_set = active_set;
+    active_layers.clear();
     rebuild_active_map(controller_maps, action_set_layer_parents);
 }
 
@@ -1229,6 +1230,7 @@ void Steam_Controller::ActivateActionSet( ControllerHandle_t controllerHandle, C
         for (auto & c: controllers) {
             c.second.activate_action_set(actionSetHandle, controller_maps, action_set_layer_parents);
         }
+        return;
     }
 
     auto controller = controllers.find(controllerHandle);
