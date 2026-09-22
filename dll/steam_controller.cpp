@@ -1312,13 +1312,8 @@ void Steam_Controller::ActivateActionSetLayer( ControllerHandle_t controllerHand
 {
     PRINT_DEBUG("%llu %llu", controllerHandle, actionSetLayerHandle);
     if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
-        const std::string layer_name = get_action_set_name_for_handle(actionSetLayerHandle);
-        if (layer_name.empty()) return;
-        auto layer_handle = action_handles.find(layer_name);
-        if (layer_handle == action_handles.end()) return;
-
         for (auto &c : controllers) {
-            c.second.activate_action_set_layer(layer_handle->second, controller_maps, action_set_layer_parents);
+            c.second.activate_action_set_layer(actionSetLayerHandle, controller_maps, action_set_layer_parents);
         }
         return;
     }
@@ -1332,13 +1327,8 @@ void Steam_Controller::DeactivateActionSetLayer( ControllerHandle_t controllerHa
 {
     PRINT_DEBUG("%llu %llu", controllerHandle, actionSetLayerHandle);
     if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
-        const std::string layer_name = get_action_set_name_for_handle(actionSetLayerHandle);
-        if (layer_name.empty()) return;
-        auto layer_handle = action_handles.find(layer_name);
-        if (layer_handle == action_handles.end()) return;
-
         for (auto &c : controllers) {
-            c.second.deactivate_action_set_layer(layer_handle->second, controller_maps, action_set_layer_parents);
+            c.second.deactivate_action_set_layer(actionSetLayerHandle, controller_maps, action_set_layer_parents);
         }
         return;
     }
