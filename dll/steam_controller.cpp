@@ -1047,11 +1047,10 @@ bool Steam_Controller::Init(bool bExplicitlyCallRunFrame)
 {
     PRINT_DEBUG("%u", bExplicitlyCallRunFrame);
     std::lock_guard<std::recursive_mutex> lock(global_mutex);
+    explicitly_call_run_frame = bExplicitlyCallRunFrame;
     if (initialized) {
         return true;
     }
-
-    explicitly_call_run_frame = bExplicitlyCallRunFrame;
 
     if (disabled) {
         return true;
@@ -1404,8 +1403,13 @@ void Steam_Controller::DeactivateAllActionSetLayers( ControllerHandle_t controll
     PRINT_DEBUG("%llu", controllerHandle);
     if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
         global_active_layer_names.clear();
-        controller_active_layer_names.clear();
         for (auto &c : controllers) {
+            for (auto &layer_handle : c.second.active_layers) {
+                std::string layer_name = get_action_set_name_for_handle(layer_handle);
+                if (!layer_name.empty()) {
+                    controller_active_layer_names[c.first].erase(layer_name);
+                }
+            }
             c.second.deactivate_all_action_set_layers(controller_maps, action_set_layer_parents);
         }
         return;
