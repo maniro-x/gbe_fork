@@ -736,6 +736,9 @@ void Controller_Action::activate_action_set_layer(
     const std::map<ControllerActionSetHandle_t, ControllerActionSetHandle_t> &action_set_layer_parents
 )
 {
+    auto parent = action_set_layer_parents.find(active_layer);
+    if (parent == action_set_layer_parents.end() || parent->second != active_set) return;
+
     if (std::find(active_layers.begin(), active_layers.end(), active_layer) == active_layers.end()) {
         active_layers.push_back(active_layer);
     }
@@ -1299,11 +1302,9 @@ int Steam_Controller::GetActiveActionSetLayers( ControllerHandle_t controllerHan
 {
     PRINT_DEBUG("%llu", controllerHandle);
     if (!handlesOut) return 0;
+    if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) return 0;
 
     auto controller = controllers.find(controllerHandle);
-    if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
-        controller = controllers.begin();
-    }
     if (controller == controllers.end()) return 0;
 
     int count = 0;
