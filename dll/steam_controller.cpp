@@ -1030,8 +1030,9 @@ bool Steam_Controller::Init(bool bExplicitlyCallRunFrame)
         return true;
     }
 
+    explicitly_call_run_frame = bExplicitlyCallRunFrame;
+
     if (disabled) {
-        explicitly_call_run_frame = bExplicitlyCallRunFrame;
         return true;
     }
 
@@ -1055,7 +1056,6 @@ bool Steam_Controller::Init(bool bExplicitlyCallRunFrame)
     background_rumble_thread = std::thread(background_rumble, rumble_thread_data);
 
     initialized = true;
-    explicitly_call_run_frame = bExplicitlyCallRunFrame;
     return true;
 }
 
