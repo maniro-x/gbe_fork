@@ -784,23 +784,39 @@ ISteamController *Steam_Client::GetISteamController( HSteamUser hSteamUser, HSte
     if (!steam_pipes.count(hSteamPipe) || !hSteamUser) return NULL;
 
     if (strcmp(pchVersion, "STEAMCONTROLLER_INTERFACE_VERSION") == 0) { // SDK <= 1.34
-        return reinterpret_cast<ISteamController *>(static_cast<ISteamController001 *>(steam_controller));
+        auto out = reinterpret_cast<ISteamController *>(static_cast<ISteamController001 *>(steam_controller));
+        PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
+        return out;
     } else if (strcmp(pchVersion, "SteamController001") == 0) {
+        PRINT_DEBUG("resolved %s -> nullptr", pchVersion);
         return nullptr; // real steamclient64.dll returns null
     } else if (strcmp(pchVersion, "SteamController002") == 0) {
+        PRINT_DEBUG("resolved %s -> nullptr", pchVersion);
         return nullptr; // real steamclient64.dll returns null
     } else if (strcmp(pchVersion, "SteamController003") == 0) {
-        return reinterpret_cast<ISteamController *>(static_cast<ISteamController003 *>(steam_controller));
+        auto out = reinterpret_cast<ISteamController *>(static_cast<ISteamController003 *>(steam_controller));
+        PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
+        return out;
     } else if (strcmp(pchVersion, "SteamController004") == 0) {
-        return reinterpret_cast<ISteamController *>(static_cast<ISteamController004 *>(steam_controller));
+        auto out = reinterpret_cast<ISteamController *>(static_cast<ISteamController004 *>(steam_controller));
+        PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
+        return out;
     } else if (strcmp(pchVersion, "SteamController005") == 0) {
-        return reinterpret_cast<ISteamController *>(static_cast<ISteamController005 *>(steam_controller));
+        auto out = reinterpret_cast<ISteamController *>(static_cast<ISteamController005 *>(steam_controller));
+        PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
+        return out;
     } else if (strcmp(pchVersion, "SteamController006") == 0) {
-        return reinterpret_cast<ISteamController *>(static_cast<ISteamController006 *>(steam_controller));
+        auto out = reinterpret_cast<ISteamController *>(static_cast<ISteamController006 *>(steam_controller));
+        PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
+        return out;
     } else if (strcmp(pchVersion, "SteamController007") == 0) {
-        return reinterpret_cast<ISteamController *>(static_cast<ISteamController007 *>(steam_controller));
+        auto out = reinterpret_cast<ISteamController *>(static_cast<ISteamController007 *>(steam_controller));
+        PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
+        return out;
     } else if (strcmp(pchVersion, STEAMCONTROLLER_INTERFACE_VERSION) == 0) {
-        return reinterpret_cast<ISteamController *>(static_cast<ISteamController *>(steam_controller));
+        auto out = reinterpret_cast<ISteamController *>(static_cast<ISteamController *>(steam_controller));
+        PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
+        return out;
     }
 
     report_missing_impl_and_exit(pchVersion, EMU_FUNC_NAME);
@@ -1024,15 +1040,25 @@ ISteamInput *Steam_Client::GetISteamInput( HSteamUser hSteamUser, HSteamPipe hSt
     if (!steam_pipes.count(hSteamPipe) || !hSteamUser) return NULL;
 
     if (strcmp(pchVersion, "SteamInput001") == 0) {
-        return reinterpret_cast<ISteamInput *>(static_cast<ISteamInput001 *>(steam_controller));
+        auto out = reinterpret_cast<ISteamInput *>(static_cast<ISteamInput001 *>(steam_controller));
+        PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
+        return out;
     } else if (strcmp(pchVersion, "SteamInput002") == 0) {
-        return reinterpret_cast<ISteamInput *>(static_cast<ISteamInput002 *>(steam_controller));
+        auto out = reinterpret_cast<ISteamInput *>(static_cast<ISteamInput002 *>(steam_controller));
+        PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
+        return out;
     } else if (strcmp(pchVersion, "SteamInput005") == 0) {
-        return reinterpret_cast<ISteamInput *>(static_cast<ISteamInput005 *>(steam_controller));
+        auto out = reinterpret_cast<ISteamInput *>(static_cast<ISteamInput005 *>(steam_controller));
+        PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
+        return out;
     } else if (strcmp(pchVersion, "SteamInput006") == 0) {
-        return reinterpret_cast<ISteamInput *>(static_cast<ISteamInput006 *>(steam_controller));
+        auto out = reinterpret_cast<ISteamInput *>(static_cast<ISteamInput006 *>(steam_controller));
+        PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
+        return out;
     } else if (strcmp(pchVersion, STEAMINPUT_INTERFACE_VERSION) == 0) {
-        return reinterpret_cast<ISteamInput *>(static_cast<ISteamInput *>(steam_controller));
+        auto out = reinterpret_cast<ISteamInput *>(static_cast<ISteamInput *>(steam_controller));
+        PRINT_DEBUG("resolved %s -> %p", pchVersion, out);
+        return out;
     }
 
     report_missing_impl_and_exit(pchVersion, EMU_FUNC_NAME);

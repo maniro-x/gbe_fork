@@ -827,6 +827,7 @@ STEAMAPI_API ISteamHTTP *SteamHTTP()
 STEAMAPI_API ISteamController *SteamController()
 {
     PRINT_DEBUG("old");
+    PRINT_DEBUG("requesting old controller interface version '%s'", old_controller);
     CACHE_OLDSTEAM_INSTANCE(old_controller_instance, get_steam_client_old()->GetISteamController(SteamAPI_GetHSteamUser(), SteamAPI_GetHSteamPipe(), old_controller))
 }
 

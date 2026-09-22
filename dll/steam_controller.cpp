@@ -687,6 +687,134 @@ static bool load_action_manifest_vdf(
     return false;
 }
 
+static const char *debug_input_source_mode_name(enum EInputSourceMode mode)
+{
+    switch (mode) {
+    case k_EInputSourceMode_None: return "None";
+    case k_EInputSourceMode_Dpad: return "Dpad";
+    case k_EInputSourceMode_Buttons: return "Buttons";
+    case k_EInputSourceMode_FourButtons: return "FourButtons";
+    case k_EInputSourceMode_AbsoluteMouse: return "AbsoluteMouse";
+    case k_EInputSourceMode_RelativeMouse: return "RelativeMouse";
+    case k_EInputSourceMode_JoystickMove: return "JoystickMove";
+    case k_EInputSourceMode_JoystickMouse: return "JoystickMouse";
+    case k_EInputSourceMode_JoystickCamera: return "JoystickCamera";
+    case k_EInputSourceMode_ScrollWheel: return "ScrollWheel";
+    case k_EInputSourceMode_Trigger: return "Trigger";
+    case k_EInputSourceMode_TouchMenu: return "TouchMenu";
+    case k_EInputSourceMode_MouseJoystick: return "MouseJoystick";
+    case k_EInputSourceMode_MouseRegion: return "MouseRegion";
+    case k_EInputSourceMode_RadialMenu: return "RadialMenu";
+    case k_EInputSourceMode_SingleButton: return "SingleButton";
+    case k_EInputSourceMode_Switches: return "Switches";
+    default: return "Unknown";
+    }
+}
+
+static std::string debug_describe_digital_binding(int button)
+{
+    switch (button) {
+    case BUTTON_A: return "A";
+    case BUTTON_B: return "B";
+    case BUTTON_X: return "X";
+    case BUTTON_Y: return "Y";
+    case BUTTON_LEFT_SHOULDER: return "LB";
+    case BUTTON_RIGHT_SHOULDER: return "RB";
+    case BUTTON_LEFT_THUMB: return "LTHUMB";
+    case BUTTON_RIGHT_THUMB: return "RTHUMB";
+    case BUTTON_BACK: return "BACK";
+    case BUTTON_START: return "START";
+    case BUTTON_DPAD_UP: return "DUP";
+    case BUTTON_DPAD_DOWN: return "DDOWN";
+    case BUTTON_DPAD_LEFT: return "DLEFT";
+    case BUTTON_DPAD_RIGHT: return "DRIGHT";
+    case BUTTON_LTRIGGER: return "LTRIGGER_BTN";
+    case BUTTON_RTRIGGER: return "RTRIGGER_BTN";
+    case BUTTON_STICK_LEFT_UP: return "LSTICK_UP";
+    case BUTTON_STICK_LEFT_DOWN: return "LSTICK_DOWN";
+    case BUTTON_STICK_LEFT_LEFT: return "LSTICK_LEFT";
+    case BUTTON_STICK_LEFT_RIGHT: return "LSTICK_RIGHT";
+    case BUTTON_STICK_RIGHT_UP: return "RSTICK_UP";
+    case BUTTON_STICK_RIGHT_DOWN: return "RSTICK_DOWN";
+    case BUTTON_STICK_RIGHT_LEFT: return "RSTICK_LEFT";
+    case BUTTON_STICK_RIGHT_RIGHT: return "RSTICK_RIGHT";
+    default:
+        if (button >= JOY_ID_START) {
+            return "JOY_" + std::to_string(button - JOY_ID_START);
+        }
+        return "BTN_" + std::to_string(button);
+    }
+}
+
+static std::string debug_describe_binding_set(const std::set<int> &bindings)
+{
+    std::string out;
+    for (auto binding : bindings) {
+        if (!out.empty()) {
+            out += ",";
+        }
+        out += debug_describe_digital_binding(binding);
+    }
+    return out;
+}
+
+static std::string debug_build_raw_gamepad_snapshot(GAMEPAD_DEVICE device)
+{
+    float left_x = 0.0f, left_y = 0.0f, right_x = 0.0f, right_y = 0.0f;
+    GamepadStickNormXY(device, STICK_LEFT, &left_x, &left_y);
+    GamepadStickNormXY(device, STICK_RIGHT, &right_x, &right_y);
+
+    const float left_len = GamepadStickLength(device, STICK_LEFT);
+    const float right_len = GamepadStickLength(device, STICK_RIGHT);
+    const float lt = GamepadTriggerLength(device, TRIGGER_LEFT);
+    const float rt = GamepadTriggerLength(device, TRIGGER_RIGHT);
+
+    char buffer[512];
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "A=%d B=%d X=%d Y=%d LB=%d RB=%d BACK=%d START=%d LTHUMB=%d RTHUMB=%d DUP=%d DDOWN=%d DLEFT=%d DRIGHT=%d LT=%.3f RT=%.3f LS=(%.3f,%.3f len=%.3f) RS=(%.3f,%.3f len=%.3f)",
+        GamepadButtonDown(device, BUTTON_A),
+        GamepadButtonDown(device, BUTTON_B),
+        GamepadButtonDown(device, BUTTON_X),
+        GamepadButtonDown(device, BUTTON_Y),
+        GamepadButtonDown(device, BUTTON_LEFT_SHOULDER),
+        GamepadButtonDown(device, BUTTON_RIGHT_SHOULDER),
+        GamepadButtonDown(device, BUTTON_BACK),
+        GamepadButtonDown(device, BUTTON_START),
+        GamepadButtonDown(device, BUTTON_LEFT_THUMB),
+        GamepadButtonDown(device, BUTTON_RIGHT_THUMB),
+        GamepadButtonDown(device, BUTTON_DPAD_UP),
+        GamepadButtonDown(device, BUTTON_DPAD_DOWN),
+        GamepadButtonDown(device, BUTTON_DPAD_LEFT),
+        GamepadButtonDown(device, BUTTON_DPAD_RIGHT),
+        lt,
+        rt,
+        left_x,
+        left_y,
+        left_len,
+        right_x,
+        right_y,
+        right_len
+    );
+    return buffer;
+}
+
+static void debug_log_raw_gamepad_state(const char *context, ControllerHandle_t controllerHandle)
+{
+    if (controllerHandle == 0) return;
+    GAMEPAD_DEVICE device = (GAMEPAD_DEVICE)(controllerHandle - 1);
+    const std::string snapshot = debug_build_raw_gamepad_snapshot(device);
+    static std::map<ControllerHandle_t, std::string> previous_snapshots{};
+    auto previous = previous_snapshots.find(controllerHandle);
+    if (previous != previous_snapshots.end() && previous->second == snapshot) {
+        return;
+    }
+
+    previous_snapshots[controllerHandle] = snapshot;
+    PRINT_DEBUG("%s controller %llu raw_state %s", context, controllerHandle, snapshot.c_str());
+}
+
 } // namespace
 
 
@@ -947,17 +1075,29 @@ void Steam_Controller::refresh_controllers(
 )
 {
     const ControllerActionSetHandle_t default_action_set = get_default_action_set_handle();
+    const std::string default_action_set_name = get_action_set_name_for_handle(default_action_set);
     for (auto &controller : controllers) {
         controller.second.deactivate_all_action_set_layers(controller_maps, action_set_layer_parents);
 
         ControllerActionSetHandle_t action_set_to_activate = default_action_set;
+        std::string previous_action_set_name{};
         auto previous_action_set = previous_action_sets.find(controller.first);
         if (previous_action_set != previous_action_sets.end() && !previous_action_set->second.empty()) {
+            previous_action_set_name = previous_action_set->second;
             auto current_action_set = action_handles.find(previous_action_set->second);
             if (current_action_set != action_handles.end() && !action_set_layer_parents.count(current_action_set->second)) {
                 action_set_to_activate = current_action_set->second;
             }
         }
+
+        PRINT_DEBUG(
+            "refresh_controllers controller %llu previous_set='%s' default_set='%s' selected_set='%s' selected_handle=%llu",
+            controller.first,
+            previous_action_set_name.c_str(),
+            default_action_set_name.c_str(),
+            get_action_set_name_for_handle(action_set_to_activate).c_str(),
+            action_set_to_activate
+        );
 
         controller.second.activate_action_set(action_set_to_activate, controller_maps, action_set_layer_parents);
 
@@ -1259,6 +1399,11 @@ void Steam_Controller::RunFrame(bool bReservedValue)
     PRINT_DEBUG_ENTRY();
 
     GamepadUpdate();
+    for (int i = 0; i < GAMEPAD_COUNT; ++i) {
+        if (GamepadIsConnected((GAMEPAD_DEVICE)i)) {
+            debug_log_raw_gamepad_state("RunFrame", static_cast<ControllerHandle_t>(i + 1));
+        }
+    }
 }
 
 void Steam_Controller::RunFrame()
@@ -1284,10 +1429,10 @@ int Steam_Controller::GetConnectedControllers( ControllerHandle_t *handlesOut )
     }
 
     int count = 0;
-    if (GamepadIsConnected(GAMEPAD_0)) {*handlesOut = GAMEPAD_0 + 1; ++handlesOut; ++count;};
-    if (GamepadIsConnected(GAMEPAD_1)) {*handlesOut = GAMEPAD_1 + 1; ++handlesOut; ++count;};
-    if (GamepadIsConnected(GAMEPAD_2)) {*handlesOut = GAMEPAD_2 + 1; ++handlesOut; ++count;};
-    if (GamepadIsConnected(GAMEPAD_3)) {*handlesOut = GAMEPAD_3 + 1; ++handlesOut; ++count;};
+    if (GamepadIsConnected(GAMEPAD_0)) {*handlesOut = GAMEPAD_0 + 1; debug_log_raw_gamepad_state("GetConnectedControllers", *handlesOut); ++handlesOut; ++count;};
+    if (GamepadIsConnected(GAMEPAD_1)) {*handlesOut = GAMEPAD_1 + 1; debug_log_raw_gamepad_state("GetConnectedControllers", *handlesOut); ++handlesOut; ++count;};
+    if (GamepadIsConnected(GAMEPAD_2)) {*handlesOut = GAMEPAD_2 + 1; debug_log_raw_gamepad_state("GetConnectedControllers", *handlesOut); ++handlesOut; ++count;};
+    if (GamepadIsConnected(GAMEPAD_3)) {*handlesOut = GAMEPAD_3 + 1; debug_log_raw_gamepad_state("GetConnectedControllers", *handlesOut); ++handlesOut; ++count;};
 
     PRINT_DEBUG("returned %i connected controllers", count);
     return count;
@@ -1325,11 +1470,12 @@ ControllerActionSetHandle_t Steam_Controller::GetActionSetHandle( const char *ps
 // your state loops, instead of trying to place it in all of your state transitions.
 void Steam_Controller::ActivateActionSet( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetHandle )
 {
-    PRINT_DEBUG("%llu %llu", controllerHandle, actionSetHandle);
+    PRINT_DEBUG("%llu %llu '%s'", controllerHandle, actionSetHandle, get_action_set_name_for_handle(actionSetHandle).c_str());
     if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
         for (auto & c: controllers) {
             controller_active_layer_names[c.first].clear();
             c.second.activate_action_set(actionSetHandle, controller_maps, action_set_layer_parents);
+            PRINT_DEBUG("controller %llu active_set now '%s'", c.first, get_action_set_name_for_handle(c.second.active_set).c_str());
             for (auto &layer_name : global_active_layer_names) {
                 auto layer_handle = action_handles.find(layer_name);
                 if (layer_handle == action_handles.end()) continue;
@@ -1346,6 +1492,7 @@ void Steam_Controller::ActivateActionSet( ControllerHandle_t controllerHandle, C
 
     controller_active_layer_names[controllerHandle].clear();
     controller->second.activate_action_set(actionSetHandle, controller_maps, action_set_layer_parents);
+    PRINT_DEBUG("controller %llu active_set now '%s'", controllerHandle, get_action_set_name_for_handle(controller->second.active_set).c_str());
     for (auto &layer_name : global_active_layer_names) {
         auto layer_handle = action_handles.find(layer_name);
         if (layer_handle == action_handles.end()) continue;
@@ -1491,13 +1638,25 @@ ControllerDigitalActionData_t Steam_Controller::GetDigitalActionData( Controller
     digitalData.bState = false;
 
     auto controller = controllers.find(controllerHandle);
-    if (controller == controllers.end()) return digitalData;
+    if (controller == controllers.end()) {
+        PRINT_DEBUG("controller %llu missing while reading digital handle %llu", controllerHandle, digitalActionHandle);
+        return digitalData;
+    }
 
     std::set<int> buttons = controller->second.button_id(digitalActionHandle);
-    if (!buttons.size()) return digitalData;
+    if (!buttons.size()) {
+        PRINT_DEBUG(
+            "digital handle %llu not mapped in active set '%s' on controller %llu",
+            digitalActionHandle,
+            get_action_set_name_for_handle(controller->second.active_set).c_str(),
+            controllerHandle
+        );
+        return digitalData;
+    }
     digitalData.bActive = true;
 
     GAMEPAD_DEVICE device = (GAMEPAD_DEVICE)(controllerHandle - 1);
+    debug_log_raw_gamepad_state("GetDigitalActionData", controllerHandle);
 
     for (auto button : buttons) {
         bool pressed = false;
@@ -1550,6 +1709,15 @@ ControllerDigitalActionData_t Steam_Controller::GetDigitalActionData( Controller
         }
     }
 
+    PRINT_DEBUG(
+        "digital handle %llu controller %llu active_set '%s' bindings=[%s] active=%i state=%i",
+        digitalActionHandle,
+        controllerHandle,
+        get_action_set_name_for_handle(controller->second.active_set).c_str(),
+        debug_describe_binding_set(buttons).c_str(),
+        digitalData.bActive,
+        digitalData.bState
+    );
     return digitalData;
 }
 
@@ -1708,13 +1876,25 @@ ControllerAnalogActionData_t Steam_Controller::GetAnalogActionData( ControllerHa
     data.bActive = false;
 
     auto controller = controllers.find(controllerHandle);
-    if (controller == controllers.end()) return data;
+    if (controller == controllers.end()) {
+        PRINT_DEBUG("controller %llu missing while reading analog handle %llu", controllerHandle, analogActionHandle);
+        return data;
+    }
 
     auto analog = controller->second.analog_id(analogActionHandle);
-    if (!analog.first.size()) return data;
+    if (!analog.first.size()) {
+        PRINT_DEBUG(
+            "analog handle %llu not mapped in active set '%s' on controller %llu",
+            analogActionHandle,
+            get_action_set_name_for_handle(controller->second.active_set).c_str(),
+            controllerHandle
+        );
+        return data;
+    }
 
     data.bActive = true;
     data.eMode = analog.second;
+    debug_log_raw_gamepad_state("GetAnalogActionData", controllerHandle);
 
     for (auto a : analog.first) {
         if (a >= JOY_ID_START) {
@@ -1744,6 +1924,17 @@ ControllerAnalogActionData_t Steam_Controller::GetAnalogActionData( ControllerHa
         }
     }
 
+    PRINT_DEBUG(
+        "analog handle %llu controller %llu active_set '%s' mode=%s bindings=[%s] active=%i x=%.3f y=%.3f",
+        analogActionHandle,
+        controllerHandle,
+        get_action_set_name_for_handle(controller->second.active_set).c_str(),
+        debug_input_source_mode_name(data.eMode),
+        debug_describe_binding_set(analog.first).c_str(),
+        data.bActive,
+        data.x,
+        data.y
+    );
     return data;
 }
 
@@ -1897,9 +2088,14 @@ int Steam_Controller::GetGamepadIndexForController( ControllerHandle_t ulControl
 {
     PRINT_DEBUG_ENTRY();
     auto controller = controllers.find(ulControllerHandle);
-    if (controller == controllers.end()) return -1;
+    if (controller == controllers.end()) {
+        PRINT_DEBUG("controller %llu has no gamepad index", ulControllerHandle);
+        return -1;
+    }
 
-    return static_cast<int>(ulControllerHandle) - 1;
+    const int out = static_cast<int>(ulControllerHandle) - 1;
+    PRINT_DEBUG("controller %llu -> gamepad index %i", ulControllerHandle, out);
+    return out;
 }
 
 
@@ -1909,7 +2105,11 @@ ControllerHandle_t Steam_Controller::GetControllerForGamepadIndex( int nIndex )
     PRINT_DEBUG("%i", nIndex);
     ControllerHandle_t out = nIndex + 1;
     auto controller = controllers.find(out);
-    if (controller == controllers.end()) return 0;
+    if (controller == controllers.end()) {
+        PRINT_DEBUG("gamepad index %i has no controller handle", nIndex);
+        return 0;
+    }
+    PRINT_DEBUG("gamepad index %i -> controller handle %llu", nIndex, out);
     return out;
 }
 

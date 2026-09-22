@@ -150,6 +150,7 @@ STEAMAPI_API void *SteamAPI_ISteamClient_GetISteamUnifiedMessages(intptr_t insta
 
 STEAMAPI_API ISteamController * SteamAPI_ISteamClient_GetISteamController( ISteamClient* self, HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char * pchVersion )
 {
+    PRINT_DEBUG("self=%p version=%s user=%u pipe=%u", self, pchVersion ? pchVersion : "(null)", hSteamUser, hSteamPipe);
     return get_steam_client()->GetISteamController(hSteamUser, hSteamPipe, pchVersion);
 }
 
@@ -196,6 +197,7 @@ STEAMAPI_API ISteamParentalSettings * SteamAPI_ISteamClient_GetISteamParentalSet
 
 STEAMAPI_API ISteamInput * SteamAPI_ISteamClient_GetISteamInput( ISteamClient* self, HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char * pchVersion )
 {
+    PRINT_DEBUG("self=%p version=%s user=%u pipe=%u", self, pchVersion ? pchVersion : "(null)", hSteamUser, hSteamPipe);
     return get_steam_client()->GetISteamInput(hSteamUser, hSteamPipe, pchVersion);
 }
 
@@ -3212,31 +3214,37 @@ STEAMAPI_API steam_bool SteamAPI_ISteamHTTP_GetHTTPRequestWasTimedOut( ISteamHTT
 
 STEAMAPI_API ISteamInput *SteamAPI_SteamInput_v001()
 {
+    PRINT_DEBUG_ENTRY();
     return get_steam_client()->GetISteamInput(flat_hsteamuser(), flat_hsteampipe(), "SteamInput001");
 }
 
 STEAMAPI_API ISteamInput *SteamAPI_SteamInput_v002()
 {
+    PRINT_DEBUG_ENTRY();
     return get_steam_client()->GetISteamInput(flat_hsteamuser(), flat_hsteampipe(), "SteamInput002");
 }
 
 STEAMAPI_API ISteamInput *SteamAPI_SteamInput_v005()
 {
+    PRINT_DEBUG_ENTRY();
     return get_steam_client()->GetISteamInput(flat_hsteamuser(), flat_hsteampipe(), "SteamInput005");
 }
 
 STEAMAPI_API ISteamInput *SteamAPI_SteamInput_v006()
 {
+    PRINT_DEBUG_ENTRY();
     return get_steam_client()->GetISteamInput(flat_hsteamuser(), flat_hsteampipe(), "SteamInput006");
 }
 
 STEAMAPI_API ISteamInput *SteamAPI_SteamInput_v007()
 {
+    PRINT_DEBUG_ENTRY();
     return get_steam_client()->GetISteamInput(flat_hsteamuser(), flat_hsteampipe(), "SteamInput007");
 }
 
 STEAMAPI_API steam_bool SteamAPI_ISteamInput_Init( ISteamInput* self, bool bExplicitlyCallRunFrame )
 {
+    PRINT_DEBUG("self=%p explicitly_call_run_frame=%i", self, bExplicitlyCallRunFrame);
     //TODO: do something with bExplicitlyCallRunFrame
     return (get_steam_client()->steam_controller)->Init();
 }
@@ -3268,6 +3276,7 @@ STEAMAPI_API steam_bool SteamAPI_ISteamInput_BNewDataAvailable( ISteamInput* sel
 
 STEAMAPI_API int SteamAPI_ISteamInput_GetConnectedControllers( ISteamInput* self, InputHandle_t * handlesOut )
 {
+    PRINT_DEBUG("self=%p handles_out=%p", self, handlesOut);
     return (get_steam_client()->steam_controller)->GetConnectedControllers(handlesOut);
 }
 
@@ -3283,11 +3292,13 @@ STEAMAPI_API void SteamAPI_ISteamInput_EnableActionEventCallbacks( ISteamInput* 
 
 STEAMAPI_API InputActionSetHandle_t SteamAPI_ISteamInput_GetActionSetHandle( ISteamInput* self, const char * pszActionSetName )
 {
+    PRINT_DEBUG("self=%p action_set=%s", self, pszActionSetName ? pszActionSetName : "(null)");
     return (get_steam_client()->steam_controller)->GetActionSetHandle(pszActionSetName);
 }
 
 STEAMAPI_API void SteamAPI_ISteamInput_ActivateActionSet( ISteamInput* self, InputHandle_t inputHandle, InputActionSetHandle_t actionSetHandle )
 {
+    PRINT_DEBUG("self=%p input=%llu action_set=%llu", self, inputHandle, actionSetHandle);
     return (get_steam_client()->steam_controller)->ActivateActionSet(inputHandle, actionSetHandle);
 }
 
@@ -3323,6 +3334,7 @@ STEAMAPI_API InputDigitalActionHandle_t SteamAPI_ISteamInput_GetDigitalActionHan
 
 STEAMAPI_API InputDigitalActionData_t SteamAPI_ISteamInput_GetDigitalActionData( ISteamInput* self, InputHandle_t inputHandle, InputDigitalActionHandle_t digitalActionHandle )
 {
+    PRINT_DEBUG("self=%p input=%llu digital_action=%llu", self, inputHandle, digitalActionHandle);
     return (get_steam_client()->steam_controller)->GetDigitalActionData(inputHandle, digitalActionHandle);
 }
 
@@ -3343,6 +3355,7 @@ STEAMAPI_API InputAnalogActionHandle_t SteamAPI_ISteamInput_GetAnalogActionHandl
 
 STEAMAPI_API InputAnalogActionData_t SteamAPI_ISteamInput_GetAnalogActionData( ISteamInput* self, InputHandle_t inputHandle, InputAnalogActionHandle_t analogActionHandle )
 {
+    PRINT_DEBUG("self=%p input=%llu analog_action=%llu", self, inputHandle, analogActionHandle);
     return (get_steam_client()->steam_controller)->GetAnalogActionData(inputHandle, analogActionHandle);
 }
 
@@ -3493,16 +3506,19 @@ STEAMAPI_API void SteamAPI_ISteamInput_SetDualSenseTriggerEffect( ISteamInput* s
 
 STEAMAPI_API ISteamController *SteamAPI_SteamController_v007()
 {
+    PRINT_DEBUG_ENTRY();
     return get_steam_client()->GetISteamController(flat_hsteamuser(), flat_hsteampipe(), "SteamController007");
 }
 
 STEAMAPI_API ISteamController *SteamAPI_SteamController_v008()
 {
+    PRINT_DEBUG_ENTRY();
     return get_steam_client()->GetISteamController(flat_hsteamuser(), flat_hsteampipe(), "SteamController008");
 }
 
 STEAMAPI_API steam_bool SteamAPI_ISteamController_Init( ISteamController* self )
 {
+    PRINT_DEBUG("self=%p", self);
     return (get_steam_client()->steam_controller)->Init();
 }
 
@@ -3518,16 +3534,19 @@ STEAMAPI_API void SteamAPI_ISteamController_RunFrame( ISteamController* self )
 
 STEAMAPI_API int SteamAPI_ISteamController_GetConnectedControllers( ISteamController* self, ControllerHandle_t * handlesOut )
 {
+    PRINT_DEBUG("self=%p handles_out=%p", self, handlesOut);
     return (get_steam_client()->steam_controller)->GetConnectedControllers(handlesOut);
 }
 
 STEAMAPI_API ControllerActionSetHandle_t SteamAPI_ISteamController_GetActionSetHandle( ISteamController* self, const char * pszActionSetName )
 {
+    PRINT_DEBUG("self=%p action_set=%s", self, pszActionSetName ? pszActionSetName : "(null)");
     return (get_steam_client()->steam_controller)->GetActionSetHandle(pszActionSetName);
 }
 
 STEAMAPI_API void SteamAPI_ISteamController_ActivateActionSet( ISteamController* self, ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetHandle )
 {
+    PRINT_DEBUG("self=%p controller=%llu action_set=%llu", self, controllerHandle, actionSetHandle);
     return (get_steam_client()->steam_controller)->ActivateActionSet(controllerHandle, actionSetHandle);
 }
 
@@ -3563,6 +3582,7 @@ STEAMAPI_API ControllerDigitalActionHandle_t SteamAPI_ISteamController_GetDigita
 
 STEAMAPI_API InputDigitalActionData_t SteamAPI_ISteamController_GetDigitalActionData( ISteamController* self, ControllerHandle_t controllerHandle, ControllerDigitalActionHandle_t digitalActionHandle )
 {
+    PRINT_DEBUG("self=%p controller=%llu digital_action=%llu", self, controllerHandle, digitalActionHandle);
     return (get_steam_client()->steam_controller)->GetDigitalActionData(controllerHandle, digitalActionHandle);
 }
 
@@ -3578,6 +3598,7 @@ STEAMAPI_API ControllerAnalogActionHandle_t SteamAPI_ISteamController_GetAnalogA
 
 STEAMAPI_API InputAnalogActionData_t SteamAPI_ISteamController_GetAnalogActionData( ISteamController* self, ControllerHandle_t controllerHandle, ControllerAnalogActionHandle_t analogActionHandle )
 {
+    PRINT_DEBUG("self=%p controller=%llu analog_action=%llu", self, controllerHandle, analogActionHandle);
     return (get_steam_client()->steam_controller)->GetAnalogActionData(controllerHandle, analogActionHandle);
 }
 
