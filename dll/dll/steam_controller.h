@@ -120,6 +120,7 @@ public ISteamInput
     std::map<std::string, ControllerAnalogActionHandle_t> analog_action_handles{};
     std::string default_action_set_name{};
     std::set<std::string> global_active_layer_names{};
+    std::map<ControllerHandle_t, std::set<std::string>> controller_active_layer_names{};
 
     std::map<ControllerActionSetHandle_t, struct Controller_Map> controller_maps{};
     std::map<ControllerActionSetHandle_t, ControllerActionSetHandle_t> action_set_layer_parents{};
