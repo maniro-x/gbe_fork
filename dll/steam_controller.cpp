@@ -934,7 +934,17 @@ std::string Steam_Controller::get_action_set_name_for_handle(ControllerActionSet
     return {};
 }
 
-void Steam_Controller::refresh_controllers(const std::map<ControllerHandle_t, std::string> &previous_action_sets)
+void Steam_Controller::activate_action_layer_name(Controller_Action &controller, const std::string &layer_name)
+{
+    auto layer_handle = action_handles.find(layer_name);
+    if (layer_handle == action_handles.end()) return;
+    controller.activate_action_set_layer(layer_handle->second, controller_maps, action_set_layer_parents);
+}
+
+void Steam_Controller::refresh_controllers(
+    const std::map<ControllerHandle_t, std::string> &previous_action_sets,
+    const std::map<ControllerHandle_t, std::vector<std::string>> &previous_action_layers
+)
 {
     const ControllerActionSetHandle_t default_action_set = get_default_action_set_handle();
     for (auto &controller : controllers) {
@@ -950,6 +960,17 @@ void Steam_Controller::refresh_controllers(const std::map<ControllerHandle_t, st
         }
 
         controller.second.activate_action_set(action_set_to_activate, controller_maps, action_set_layer_parents);
+
+        auto previous_layers = previous_action_layers.find(controller.first);
+        if (previous_layers != previous_action_layers.end()) {
+            for (auto &layer_name : previous_layers->second) {
+                activate_action_layer_name(controller.second, layer_name);
+            }
+        }
+
+        for (auto &layer_name : global_active_layer_names) {
+            activate_action_layer_name(controller.second, layer_name);
+        }
     }
 }
 
@@ -1040,8 +1061,15 @@ bool Steam_Controller::Init(bool bExplicitlyCallRunFrame)
     GamepadUpdate();
 
     std::map<ControllerHandle_t, std::string> previous_action_sets{};
+    std::map<ControllerHandle_t, std::vector<std::string>> previous_action_layers{};
     for (auto &controller : controllers) {
         previous_action_sets[controller.first] = get_action_set_name_for_handle(controller.second.active_set);
+        for (auto &layer_handle : controller.second.active_layers) {
+            std::string layer_name = get_action_set_name_for_handle(layer_handle);
+            if (!layer_name.empty()) {
+                previous_action_layers[controller.first].push_back(layer_name);
+            }
+        }
     }
 
     controllers = std::map<ControllerHandle_t, struct Controller_Action>();
@@ -1050,7 +1078,7 @@ bool Steam_Controller::Init(bool bExplicitlyCallRunFrame)
         controllers.insert(std::pair<ControllerHandle_t, struct Controller_Action>(i, cont_action));
     }
 
-    refresh_controllers(previous_action_sets);
+    refresh_controllers(previous_action_sets, previous_action_layers);
 
     rumble_thread_data = new Rumble_Thread_Data();
     background_rumble_thread = std::thread(background_rumble, rumble_thread_data);
@@ -1066,8 +1094,15 @@ bool Steam_Controller::Init( const char *pchAbsolutePathToControllerConfigVDF )
         std::lock_guard<std::recursive_mutex> lock(global_mutex);
 
         std::map<ControllerHandle_t, std::string> previous_action_sets{};
+        std::map<ControllerHandle_t, std::vector<std::string>> previous_action_layers{};
         for (auto &controller : controllers) {
             previous_action_sets[controller.first] = get_action_set_name_for_handle(controller.second.active_set);
+            for (auto &layer_handle : controller.second.active_layers) {
+                std::string layer_name = get_action_set_name_for_handle(layer_handle);
+                if (!layer_name.empty()) {
+                    previous_action_layers[controller.first].push_back(layer_name);
+                }
+            }
         }
 
         Action_Set_Map action_sets =
@@ -1086,7 +1121,7 @@ bool Steam_Controller::Init( const char *pchAbsolutePathToControllerConfigVDF )
             }
             set_handles();
             disabled = !settings->controller_settings.enabled && action_handles.empty();
-            refresh_controllers(previous_action_sets);
+            refresh_controllers(previous_action_sets, previous_action_layers);
         }
     }
 
@@ -1137,8 +1172,15 @@ bool Steam_Controller::SetInputActionManifestFilePath( const char *pchInputActio
     std::lock_guard<std::recursive_mutex> lock(global_mutex);
 
     std::map<ControllerHandle_t, std::string> previous_action_sets{};
+    std::map<ControllerHandle_t, std::vector<std::string>> previous_action_layers{};
     for (auto &controller : controllers) {
         previous_action_sets[controller.first] = get_action_set_name_for_handle(controller.second.active_set);
+        for (auto &layer_handle : controller.second.active_layers) {
+            std::string layer_name = get_action_set_name_for_handle(layer_handle);
+            if (!layer_name.empty()) {
+                previous_action_layers[controller.first].push_back(layer_name);
+            }
+        }
     }
 
     Action_Set_Map action_sets =
@@ -1160,7 +1202,7 @@ bool Steam_Controller::SetInputActionManifestFilePath( const char *pchInputActio
     }
     set_handles();
     disabled = !settings->controller_settings.enabled && action_handles.empty();
-    refresh_controllers(previous_action_sets);
+    refresh_controllers(previous_action_sets, previous_action_layers);
 
     if (!disabled && !initialized) {
         return Init(explicitly_call_run_frame);
@@ -1287,6 +1329,9 @@ void Steam_Controller::ActivateActionSet( ControllerHandle_t controllerHandle, C
     if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
         for (auto & c: controllers) {
             c.second.activate_action_set(actionSetHandle, controller_maps, action_set_layer_parents);
+            for (auto &layer_name : global_active_layer_names) {
+                activate_action_layer_name(c.second, layer_name);
+            }
         }
         return;
     }
@@ -1295,6 +1340,9 @@ void Steam_Controller::ActivateActionSet( ControllerHandle_t controllerHandle, C
     if (controller == controllers.end()) return;
 
     controller->second.activate_action_set(actionSetHandle, controller_maps, action_set_layer_parents);
+    for (auto &layer_name : global_active_layer_names) {
+        activate_action_layer_name(controller->second, layer_name);
+    }
 }
 
 ControllerActionSetHandle_t Steam_Controller::GetCurrentActionSet( ControllerHandle_t controllerHandle )
@@ -1311,7 +1359,11 @@ ControllerActionSetHandle_t Steam_Controller::GetCurrentActionSet( ControllerHan
 void Steam_Controller::ActivateActionSetLayer( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetLayerHandle )
 {
     PRINT_DEBUG("%llu %llu", controllerHandle, actionSetLayerHandle);
+    const std::string layer_name = get_action_set_name_for_handle(actionSetLayerHandle);
     if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
+        if (!layer_name.empty()) {
+            global_active_layer_names.insert(layer_name);
+        }
         for (auto &c : controllers) {
             c.second.activate_action_set_layer(actionSetLayerHandle, controller_maps, action_set_layer_parents);
         }
@@ -1326,7 +1378,11 @@ void Steam_Controller::ActivateActionSetLayer( ControllerHandle_t controllerHand
 void Steam_Controller::DeactivateActionSetLayer( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetLayerHandle )
 {
     PRINT_DEBUG("%llu %llu", controllerHandle, actionSetLayerHandle);
+    const std::string layer_name = get_action_set_name_for_handle(actionSetLayerHandle);
     if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
+        if (!layer_name.empty()) {
+            global_active_layer_names.erase(layer_name);
+        }
         for (auto &c : controllers) {
             c.second.deactivate_action_set_layer(actionSetLayerHandle, controller_maps, action_set_layer_parents);
         }
@@ -1342,6 +1398,7 @@ void Steam_Controller::DeactivateAllActionSetLayers( ControllerHandle_t controll
 {
     PRINT_DEBUG("%llu", controllerHandle);
     if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
+        global_active_layer_names.clear();
         for (auto &c : controllers) {
             c.second.deactivate_all_action_set_layers(controller_maps, action_set_layer_parents);
         }

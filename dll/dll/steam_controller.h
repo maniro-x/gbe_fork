@@ -119,6 +119,7 @@ public ISteamInput
     std::map<std::string, ControllerDigitalActionHandle_t> digital_action_handles{};
     std::map<std::string, ControllerAnalogActionHandle_t> analog_action_handles{};
     std::string default_action_set_name{};
+    std::set<std::string> global_active_layer_names{};
 
     std::map<ControllerActionSetHandle_t, struct Controller_Map> controller_maps{};
     std::map<ControllerActionSetHandle_t, ControllerActionSetHandle_t> action_set_layer_parents{};
@@ -137,7 +138,11 @@ public ISteamInput
     void set_handles();
     ControllerActionSetHandle_t get_default_action_set_handle() const;
     std::string get_action_set_name_for_handle(ControllerActionSetHandle_t handle) const;
-    void refresh_controllers(const std::map<ControllerHandle_t, std::string> &previous_action_sets = {});
+    void activate_action_layer_name(Controller_Action &controller, const std::string &layer_name);
+    void refresh_controllers(
+        const std::map<ControllerHandle_t, std::string> &previous_action_sets = {},
+        const std::map<ControllerHandle_t, std::vector<std::string>> &previous_action_layers = {}
+    );
 
     void RunCallbacks();
 
