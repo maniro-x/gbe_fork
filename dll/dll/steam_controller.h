@@ -135,6 +135,7 @@ public ISteamInput
     bool disabled{};
     bool initialized{};
     bool explicitly_call_run_frame{};
+    bool pending_explicitly_call_run_frame{};
 
     void set_handles();
     ControllerActionSetHandle_t get_default_action_set_handle() const;

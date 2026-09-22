@@ -1047,7 +1047,7 @@ bool Steam_Controller::Init(bool bExplicitlyCallRunFrame)
 {
     PRINT_DEBUG("%u", bExplicitlyCallRunFrame);
     std::lock_guard<std::recursive_mutex> lock(global_mutex);
-    explicitly_call_run_frame = bExplicitlyCallRunFrame;
+    pending_explicitly_call_run_frame = bExplicitlyCallRunFrame;
     if (initialized) {
         return true;
     }
@@ -1081,6 +1081,7 @@ bool Steam_Controller::Init(bool bExplicitlyCallRunFrame)
     background_rumble_thread = std::thread(background_rumble, rumble_thread_data);
 
     initialized = true;
+    explicitly_call_run_frame = pending_explicitly_call_run_frame;
     return true;
 }
 
@@ -1194,7 +1195,7 @@ bool Steam_Controller::SetInputActionManifestFilePath( const char *pchInputActio
     refresh_controllers(previous_action_sets, previous_action_layers);
 
     if (!disabled && !initialized) {
-        return Init(explicitly_call_run_frame);
+        return Init(pending_explicitly_call_run_frame);
     }
 
     return !action_handles.empty();
@@ -1414,7 +1415,6 @@ void Steam_Controller::DeactivateAllActionSetLayers( ControllerHandle_t controll
     auto controller = controllers.find(controllerHandle);
     if (controller == controllers.end()) return;
     controller_active_layer_names[controllerHandle].clear();
-    controller_active_layer_names[controllerHandle].insert(global_active_layer_names.begin(), global_active_layer_names.end());
     controller->second.deactivate_all_action_set_layers(controller_maps, action_set_layer_parents);
 }
 
