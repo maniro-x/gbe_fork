@@ -1030,6 +1030,12 @@ bool Steam_Controller::Init(bool bExplicitlyCallRunFrame)
         return true;
     }
 
+    if (!controllers.empty()) {
+        initialized = true;
+        explicitly_call_run_frame = bExplicitlyCallRunFrame;
+        return true;
+    }
+
     if (disabled) {
         explicitly_call_run_frame = bExplicitlyCallRunFrame;
         return true;
