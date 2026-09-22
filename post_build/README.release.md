@@ -299,6 +299,9 @@ Steam uses things called action sets for controller configuration. An action set
 Action names are bound to buttons, triggers or joysticks.  
 The emulator needs to know for each action set, which button is linked to which action name.  
 
+Games that ship their own Steam Input action manifest and controller VDF files can now be loaded automatically when they call `SetInputActionManifestFilePath()`.
+If a game still needs manual mappings, the `steam_settings\controller\` files below are used as a fallback/override.
+
 Create a `ACTION_SET_NAME.txt` file in the `steam_settings\controller\` folder for every action set the game uses.  
 
 To see an example for the game Crystar see: `steam_settings.EXAMPLE\controller.EXAMPLE`  
