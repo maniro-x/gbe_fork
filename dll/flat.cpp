@@ -3276,7 +3276,7 @@ STEAMAPI_API steam_bool SteamAPI_ISteamInput_BNewDataAvailable( ISteamInput* sel
 STEAMAPI_API int SteamAPI_ISteamInput_GetConnectedControllers( ISteamInput* self, InputHandle_t * handlesOut )
 {
     PRINT_DEBUG("self=%p handles_out=%p", self, handlesOut);
-    return (get_steam_client()->steam_controller)->GetConnectedControllers(reinterpret_cast<ControllerHandle_t *>(handlesOut));
+    return (get_steam_client()->steam_controller)->GetConnectedControllers(handlesOut);
 }
 
 STEAMAPI_API void SteamAPI_ISteamInput_EnableDeviceCallbacks( ISteamInput* self )

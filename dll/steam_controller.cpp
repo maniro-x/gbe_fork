@@ -1439,6 +1439,11 @@ bool Steam_Controller::GetControllerState( uint32 unControllerIndex, SteamContro
 // Enumerate currently connected controllers
 // handlesOut should point to a STEAM_CONTROLLER_MAX_COUNT sized array of ControllerHandle_t handles
 // Returns the number of handles written to handlesOut
+int Steam_Controller::GetConnectedControllers( InputHandle_t *handlesOut )
+{
+    return GetConnectedControllers(reinterpret_cast<ControllerHandle_t *>(handlesOut));
+}
+
 int Steam_Controller::GetConnectedControllers( ControllerHandle_t *handlesOut )
 {
     PRINT_DEBUG_ENTRY();

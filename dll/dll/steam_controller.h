@@ -200,6 +200,7 @@ public:
     // Enumerate currently connected controllers
     // handlesOut should point to a STEAM_CONTROLLER_MAX_COUNT sized array of ControllerHandle_t handles
     // Returns the number of handles written to handlesOut
+    int GetConnectedControllers( InputHandle_t *handlesOut );
     int GetConnectedControllers( ControllerHandle_t *handlesOut );
 
 
