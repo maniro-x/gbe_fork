@@ -1030,12 +1030,6 @@ bool Steam_Controller::Init(bool bExplicitlyCallRunFrame)
         return true;
     }
 
-    if (!controllers.empty() && rumble_thread_data) {
-        initialized = true;
-        explicitly_call_run_frame = bExplicitlyCallRunFrame;
-        return true;
-    }
-
     if (disabled) {
         explicitly_call_run_frame = bExplicitlyCallRunFrame;
         return true;
