@@ -1111,9 +1111,7 @@ bool Steam_Controller::Init( const char *pchAbsolutePathToControllerConfigVDF )
             settings->controller_settings.action_sets = std::move(action_sets);
             settings->controller_settings.action_set_layer_parents = std::move(action_set_layer_parents);
             settings->controller_settings.action_set_layers = std::move(action_set_layers);
-            if (!default_action_set_name.empty()) {
-                this->default_action_set_name = std::move(default_action_set_name);
-            }
+            this->default_action_set_name = std::move(default_action_set_name);
             set_handles();
             disabled = !settings->controller_settings.enabled && action_handles.empty();
             refresh_controllers(previous_action_sets, previous_action_layers);
@@ -1190,9 +1188,7 @@ bool Steam_Controller::SetInputActionManifestFilePath( const char *pchInputActio
     settings->controller_settings.action_sets = std::move(action_sets);
     settings->controller_settings.action_set_layer_parents = std::move(action_set_layer_parents);
     settings->controller_settings.action_set_layers = std::move(action_set_layers);
-    if (!default_action_set_name.empty()) {
-        this->default_action_set_name = std::move(default_action_set_name);
-    }
+    this->default_action_set_name = std::move(default_action_set_name);
     set_handles();
     disabled = !settings->controller_settings.enabled && action_handles.empty();
     refresh_controllers(previous_action_sets, previous_action_layers);
@@ -1418,6 +1414,7 @@ void Steam_Controller::DeactivateAllActionSetLayers( ControllerHandle_t controll
     auto controller = controllers.find(controllerHandle);
     if (controller == controllers.end()) return;
     controller_active_layer_names[controllerHandle].clear();
+    controller_active_layer_names[controllerHandle].insert(global_active_layer_names.begin(), global_active_layer_names.end());
     controller->second.deactivate_all_action_set_layers(controller_maps, action_set_layer_parents);
 }
 
