@@ -1038,17 +1038,18 @@ bool Steam_Controller::Init(bool bExplicitlyCallRunFrame)
     GamepadInit();
     GamepadUpdate();
 
-    const ControllerActionSetHandle_t default_action_set = get_default_action_set_handle();
+    std::map<ControllerHandle_t, std::string> previous_action_sets{};
+    for (auto &controller : controllers) {
+        previous_action_sets[controller.first] = get_action_set_name_for_handle(controller.second.active_set);
+    }
+
+    controllers = std::map<ControllerHandle_t, struct Controller_Action>();
     for (int i = 1; i < 5; ++i) {
         struct Controller_Action cont_action(i);
-        //Activate the first action set.
-        //TODO: check exactly what decides which gets activated by default
-        if (default_action_set) {
-            cont_action.activate_action_set(default_action_set, controller_maps, action_set_layer_parents);
-        }
-
         controllers.insert(std::pair<ControllerHandle_t, struct Controller_Action>(i, cont_action));
     }
+
+    refresh_controllers(previous_action_sets);
 
     rumble_thread_data = new Rumble_Thread_Data();
     background_rumble_thread = std::thread(background_rumble, rumble_thread_data);
