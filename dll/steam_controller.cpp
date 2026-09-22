@@ -40,6 +40,9 @@ inline void GamepadSetRumble(GAMEPAD_DEVICE device, float left, float right,  un
 
 namespace {
 
+using Action_Button_Map = std::map<std::string, std::pair<std::set<std::string>, std::string>>;
+using Action_Set_Map = std::map<std::string, Action_Button_Map>;
+
 struct VdfEntry {
     std::map<std::string, std::vector<VdfEntry>> children{};
     std::string value{};
@@ -400,7 +403,9 @@ static void add_group_input_bindings(
 
 static bool load_controller_mappings_from_vdf(
     const VdfEntry &controller_mappings,
-    std::map<std::string, std::map<std::string, std::pair<std::set<std::string>, std::string>>> &action_sets
+    Action_Set_Map &action_sets,
+    std::map<std::string, std::string> &action_set_layer_parents,
+    Action_Set_Map &action_set_layers
 )
 {
     static const std::map<std::string, std::string> keymap_digital = {
@@ -456,6 +461,21 @@ static bool load_controller_mappings_from_vdf(
         }
     }
 
+    std::set<std::string> supported_action_layers{};
+    if (auto action_layers = find_first_child_ci(controller_mappings, "action_layers")) {
+        for (auto &layer_entry : action_layers->children) {
+            const std::string layer_name_upper = str_to_upper(layer_entry.first);
+            supported_action_layers.insert(layer_name_upper);
+            for (auto &layer_value : layer_entry.second) {
+                std::string parent_name = get_first_string_ci(layer_value, "parent_set_name");
+                if (!parent_name.empty()) {
+                    action_set_layer_parents[layer_name_upper] = str_to_upper(parent_name);
+                    break;
+                }
+            }
+        }
+    }
+
     auto presets = find_children_ci(controller_mappings, "preset");
     if (!presets) return false;
 
@@ -465,12 +485,36 @@ static bool load_controller_mappings_from_vdf(
         if (preset_name.empty()) continue;
 
         const std::string preset_name_upper = str_to_upper(preset_name);
-        if (preset_name_upper != "DEFAULT" && !supported_action_sets.count(preset_name_upper)) {
+        const bool is_action_layer =
+            get_first_string_ci(preset, "set_layer") == "1" ||
+            has_child_ci(preset, "parent_set_name") ||
+            supported_action_layers.count(preset_name_upper);
+
+        if (!is_action_layer && preset_name_upper != "DEFAULT" && !supported_action_sets.count(preset_name_upper)) {
             continue;
         }
 
         auto group_source_bindings = find_first_child_ci(preset, "group_source_bindings");
         if (!group_source_bindings) continue;
+
+        Action_Set_Map &target_maps = is_action_layer ? action_set_layers : action_sets;
+        const std::string target_name = preset_name_upper;
+
+        if (is_action_layer) {
+            std::string parent_name = get_first_string_ci(preset, "parent_set_name");
+            if (parent_name.empty()) {
+                auto parent = action_set_layer_parents.find(target_name);
+                if (parent != action_set_layer_parents.end()) {
+                    parent_name = parent->second;
+                }
+            } else {
+                parent_name = str_to_upper(parent_name);
+            }
+
+            if (!parent_name.empty()) {
+                action_set_layer_parents[target_name] = parent_name;
+            }
+        }
 
         for (auto &binding_entry : group_source_bindings->children) {
             auto group = groups_by_id.find(binding_entry.first);
@@ -486,7 +530,7 @@ static bool load_controller_mappings_from_vdf(
                 const std::string binding_name = str_to_lower(binding_parts[0]);
                 const VdfEntry &group_object = *group->second;
                 if (supported_keys_digital.count(binding_name)) {
-                    add_group_input_bindings(action_sets, preset_name, group_object, keymap_digital);
+                    add_group_input_bindings(target_maps, target_name, group_object, keymap_digital);
                     loaded_any = true;
                 }
 
@@ -496,8 +540,8 @@ static bool load_controller_mappings_from_vdf(
                         std::string action_name = get_first_string_ci(*gameactions, preset_name);
                         if (!action_name.empty()) {
                             loaded_any |= add_action_binding(
-                                action_sets,
-                                preset_name,
+                                target_maps,
+                                target_name,
                                 action_name,
                                 binding_name == "left_trigger" ? "LTRIGGER" : "RTRIGGER",
                                 "trigger"
@@ -506,8 +550,8 @@ static bool load_controller_mappings_from_vdf(
                     }
 
                     add_group_input_bindings(
-                        action_sets,
-                        preset_name,
+                        target_maps,
+                        target_name,
                         group_object,
                         keymap_digital,
                         binding_name == "left_trigger" ? "DLTRIGGER" : "DRTRIGGER"
@@ -527,8 +571,8 @@ static bool load_controller_mappings_from_vdf(
                             }
 
                             loaded_any |= add_action_binding(
-                                action_sets,
-                                preset_name,
+                                target_maps,
+                                target_name,
                                 action_name,
                                 analog_binding,
                                 "joystick_move"
@@ -537,18 +581,18 @@ static bool load_controller_mappings_from_vdf(
                     }
 
                     if (binding_name == "joystick") {
-                        add_group_input_bindings(action_sets, preset_name, group_object, keymap_digital, "LSTICK");
+                        add_group_input_bindings(target_maps, target_name, group_object, keymap_digital, "LSTICK");
                         loaded_any = true;
                     } else if (binding_name == "right_joystick") {
-                        add_group_input_bindings(action_sets, preset_name, group_object, keymap_digital, "RSTICK");
+                        add_group_input_bindings(target_maps, target_name, group_object, keymap_digital, "RSTICK");
                         loaded_any = true;
                     }
                 } else if (supported_keys_joystick.count(binding_name) && group_mode == "dpad") {
                     if (binding_name == "joystick") {
-                        add_group_input_bindings(action_sets, preset_name, group_object, keymap_left_joystick);
+                        add_group_input_bindings(target_maps, target_name, group_object, keymap_left_joystick);
                         loaded_any = true;
                     } else if (binding_name == "right_joystick") {
-                        add_group_input_bindings(action_sets, preset_name, group_object, keymap_right_joystick);
+                        add_group_input_bindings(target_maps, target_name, group_object, keymap_right_joystick);
                         loaded_any = true;
                     }
                 }
@@ -561,7 +605,9 @@ static bool load_controller_mappings_from_vdf(
 
 static bool load_controller_mappings_vdf_file(
     const std::filesystem::path &config_path,
-    std::map<std::string, std::map<std::string, std::pair<std::set<std::string>, std::string>>> &action_sets
+    Action_Set_Map &action_sets,
+    std::map<std::string, std::string> &action_set_layer_parents,
+    Action_Set_Map &action_set_layers
 )
 {
     VdfEntry root{};
@@ -578,12 +624,14 @@ static bool load_controller_mappings_vdf_file(
     }
 
     if (!controller_mappings) return false;
-    return load_controller_mappings_from_vdf(*controller_mappings, action_sets);
+    return load_controller_mappings_from_vdf(*controller_mappings, action_sets, action_set_layer_parents, action_set_layers);
 }
 
 static bool load_action_manifest_vdf(
     const std::filesystem::path &manifest_path,
-    std::map<std::string, std::map<std::string, std::pair<std::set<std::string>, std::string>>> &action_sets
+    Action_Set_Map &action_sets,
+    std::map<std::string, std::string> &action_set_layer_parents,
+    Action_Set_Map &action_set_layers
 )
 {
     VdfEntry root{};
@@ -594,7 +642,7 @@ static bool load_action_manifest_vdf(
 
     if (has_child_ci(*manifest_root, "controller_mappings")) {
         auto controller_mappings = find_first_child_ci(*manifest_root, "controller_mappings");
-        return controller_mappings && load_controller_mappings_from_vdf(*controller_mappings, action_sets);
+        return controller_mappings && load_controller_mappings_from_vdf(*controller_mappings, action_sets, action_set_layer_parents, action_set_layers);
     }
 
     auto configurations = find_first_child_ci(*manifest_root, "configurations");
@@ -623,7 +671,7 @@ static bool load_action_manifest_vdf(
 
                 auto config_path = resolve_vdf_path(manifest_path.parent_path(), path_string);
                 if (config_path.empty()) continue;
-                if (load_controller_mappings_vdf_file(config_path, action_sets)) {
+                if (load_controller_mappings_vdf_file(config_path, action_sets, action_set_layer_parents, action_set_layers)) {
                     return true;
                 }
             }
@@ -640,11 +688,77 @@ Controller_Action::Controller_Action(ControllerHandle_t controller_handle) {
     this->controller_handle = controller_handle;
 }
 
-void Controller_Action::activate_action_set(ControllerDigitalActionHandle_t active_set, std::map<ControllerActionSetHandle_t, struct Controller_Map> &controller_maps) {
+static void merge_controller_map(struct Controller_Map &target, const struct Controller_Map &overlay)
+{
+    for (auto &entry : overlay.active_digital) {
+        target.active_digital[entry.first] = entry.second;
+    }
+
+    for (auto &entry : overlay.active_analog) {
+        target.active_analog[entry.first] = entry.second;
+    }
+}
+
+void Controller_Action::rebuild_active_map(
+    const std::map<ControllerActionSetHandle_t, struct Controller_Map> &controller_maps,
+    const std::map<ControllerActionSetHandle_t, ControllerActionSetHandle_t> &action_set_layer_parents
+)
+{
+    active_map = {};
     auto map = controller_maps.find(active_set);
     if (map == controller_maps.end()) return;
+
+    active_map = map->second;
+    for (auto &layer_handle : active_layers) {
+        auto parent = action_set_layer_parents.find(layer_handle);
+        if (parent == action_set_layer_parents.end() || parent->second != active_set) continue;
+
+        auto layer_map = controller_maps.find(layer_handle);
+        if (layer_map == controller_maps.end()) continue;
+        merge_controller_map(active_map, layer_map->second);
+    }
+}
+
+void Controller_Action::activate_action_set(
+    ControllerActionSetHandle_t active_set,
+    const std::map<ControllerActionSetHandle_t, struct Controller_Map> &controller_maps,
+    const std::map<ControllerActionSetHandle_t, ControllerActionSetHandle_t> &action_set_layer_parents
+)
+{
     this->active_set = active_set;
-    this->active_map = map->second;
+    rebuild_active_map(controller_maps, action_set_layer_parents);
+}
+
+void Controller_Action::activate_action_set_layer(
+    ControllerActionSetHandle_t active_layer,
+    const std::map<ControllerActionSetHandle_t, struct Controller_Map> &controller_maps,
+    const std::map<ControllerActionSetHandle_t, ControllerActionSetHandle_t> &action_set_layer_parents
+)
+{
+    if (std::find(active_layers.begin(), active_layers.end(), active_layer) == active_layers.end()) {
+        active_layers.push_back(active_layer);
+    }
+
+    rebuild_active_map(controller_maps, action_set_layer_parents);
+}
+
+void Controller_Action::deactivate_action_set_layer(
+    ControllerActionSetHandle_t active_layer,
+    const std::map<ControllerActionSetHandle_t, struct Controller_Map> &controller_maps,
+    const std::map<ControllerActionSetHandle_t, ControllerActionSetHandle_t> &action_set_layer_parents
+)
+{
+    active_layers.erase(std::remove(active_layers.begin(), active_layers.end(), active_layer), active_layers.end());
+    rebuild_active_map(controller_maps, action_set_layer_parents);
+}
+
+void Controller_Action::deactivate_all_action_set_layers(
+    const std::map<ControllerActionSetHandle_t, struct Controller_Map> &controller_maps,
+    const std::map<ControllerActionSetHandle_t, ControllerActionSetHandle_t> &action_set_layer_parents
+)
+{
+    active_layers.clear();
+    rebuild_active_map(controller_maps, action_set_layer_parents);
 }
 
 std::set<int> Controller_Action::button_id(ControllerDigitalActionHandle_t handle) {
@@ -703,15 +817,21 @@ const std::map<std::string, enum EInputSourceMode> Steam_Controller::analog_inpu
 };
 
 
-void Steam_Controller::set_handles(std::map<std::string, std::map<std::string, std::pair<std::set<std::string>, std::string>>> action_sets)
+void Steam_Controller::set_handles()
 {
+    action_handles.clear();
+    digital_action_handles.clear();
+    analog_action_handles.clear();
+    controller_maps.clear();
+    action_set_layer_parents.clear();
+
     uint64 handle_num = 1;
-    for (auto & set : action_sets) {
+    auto add_action_set = [&](const std::string &set_name, const Action_Button_Map &buttons) {
         ControllerActionSetHandle_t action_handle_num = handle_num;
         ++handle_num;
 
-        action_handles[set.first] = action_handle_num;
-        for (auto & config_key : set.second) {
+        action_handles[set_name] = action_handle_num;
+        for (auto & config_key : buttons) {
             uint64 current_handle_num = handle_num;
             ++handle_num;
 
@@ -760,6 +880,40 @@ void Steam_Controller::set_handles(std::map<std::string, std::map<std::string, s
                 }
             }
         }
+    };
+
+    for (auto &set : settings->controller_settings.action_sets) {
+        add_action_set(set.first, set.second);
+    }
+
+    for (auto &set : settings->controller_settings.action_set_layers) {
+        add_action_set(set.first, set.second);
+        auto parent = settings->controller_settings.action_set_layer_parents.find(set.first);
+        if (parent == settings->controller_settings.action_set_layer_parents.end()) continue;
+
+        auto parent_handle = action_handles.find(parent->second);
+        if (parent_handle == action_handles.end()) continue;
+        action_set_layer_parents[action_handles[set.first]] = parent_handle->second;
+    }
+}
+
+ControllerActionSetHandle_t Steam_Controller::get_default_action_set_handle() const
+{
+    for (auto &action_handle : action_handles) {
+        if (!action_set_layer_parents.count(action_handle.second)) {
+            return action_handle.second;
+        }
+    }
+
+    return 0;
+}
+
+void Steam_Controller::refresh_controllers()
+{
+    const ControllerActionSetHandle_t default_action_set = get_default_action_set_handle();
+    for (auto &controller : controllers) {
+        controller.second.deactivate_all_action_set_layers(controller_maps, action_set_layer_parents);
+        controller.second.activate_action_set(default_action_set, controller_maps, action_set_layer_parents);
     }
 }
 
@@ -816,7 +970,7 @@ Steam_Controller::Steam_Controller(class Settings *settings, class SteamCallResu
     this->callbacks = callbacks;
     this->run_every_runcb = run_every_runcb;
 
-    set_handles(settings->controller_settings.action_sets);
+    set_handles();
     disabled = !settings->controller_settings.enabled && action_handles.empty();
     initialized = false;
     
@@ -837,18 +991,20 @@ bool Steam_Controller::Init(bool bExplicitlyCallRunFrame)
     PRINT_DEBUG("%u", bExplicitlyCallRunFrame);
     std::lock_guard<std::recursive_mutex> lock(global_mutex);
     if (disabled || initialized) {
+        explicitly_call_run_frame = bExplicitlyCallRunFrame;
         return true;
     }
 
     GamepadInit();
     GamepadUpdate();
 
+    const ControllerActionSetHandle_t default_action_set = get_default_action_set_handle();
     for (int i = 1; i < 5; ++i) {
         struct Controller_Action cont_action(i);
         //Activate the first action set.
         //TODO: check exactly what decides which gets activated by default
-        if (action_handles.size() >= 1) {
-            cont_action.activate_action_set(action_handles.begin()->second, controller_maps);
+        if (default_action_set) {
+            cont_action.activate_action_set(default_action_set, controller_maps, action_set_layer_parents);
         }
 
         controllers.insert(std::pair<ControllerHandle_t, struct Controller_Action>(i, cont_action));
@@ -868,16 +1024,19 @@ bool Steam_Controller::Init( const char *pchAbsolutePathToControllerConfigVDF )
     if (pchAbsolutePathToControllerConfigVDF) {
         std::lock_guard<std::recursive_mutex> lock(global_mutex);
 
-        std::map<std::string, std::map<std::string, std::pair<std::set<std::string>, std::string>>> action_sets =
+        Action_Set_Map action_sets =
             settings->controller_settings.action_sets;
-        if (load_controller_mappings_vdf_file(std::filesystem::u8path(pchAbsolutePathToControllerConfigVDF), action_sets)) {
-            settings->controller_settings.action_sets = action_sets;
-            action_handles.clear();
-            digital_action_handles.clear();
-            analog_action_handles.clear();
-            controller_maps.clear();
-            set_handles(settings->controller_settings.action_sets);
+        std::map<std::string, std::string> action_set_layer_parents =
+            settings->controller_settings.action_set_layer_parents;
+        Action_Set_Map action_set_layers =
+            settings->controller_settings.action_set_layers;
+        if (load_controller_mappings_vdf_file(std::filesystem::u8path(pchAbsolutePathToControllerConfigVDF), action_sets, action_set_layer_parents, action_set_layers)) {
+            settings->controller_settings.action_sets = std::move(action_sets);
+            settings->controller_settings.action_set_layer_parents = std::move(action_set_layer_parents);
+            settings->controller_settings.action_set_layers = std::move(action_set_layers);
+            set_handles();
             disabled = !settings->controller_settings.enabled && action_handles.empty();
+            refresh_controllers();
         }
     }
 
@@ -927,27 +1086,25 @@ bool Steam_Controller::SetInputActionManifestFilePath( const char *pchInputActio
 
     std::lock_guard<std::recursive_mutex> lock(global_mutex);
 
-    std::map<std::string, std::map<std::string, std::pair<std::set<std::string>, std::string>>> action_sets =
+    Action_Set_Map action_sets =
         settings->controller_settings.action_sets;
-    if (!load_action_manifest_vdf(std::filesystem::u8path(pchInputActionManifestAbsolutePath), action_sets)) {
+    std::map<std::string, std::string> action_set_layer_parents =
+        settings->controller_settings.action_set_layer_parents;
+    Action_Set_Map action_set_layers =
+        settings->controller_settings.action_set_layers;
+    if (!load_action_manifest_vdf(std::filesystem::u8path(pchInputActionManifestAbsolutePath), action_sets, action_set_layer_parents, action_set_layers)) {
         return false;
     }
 
     settings->controller_settings.action_sets = std::move(action_sets);
-
-    action_handles.clear();
-    digital_action_handles.clear();
-    analog_action_handles.clear();
-    controller_maps.clear();
-    set_handles(settings->controller_settings.action_sets);
+    settings->controller_settings.action_set_layer_parents = std::move(action_set_layer_parents);
+    settings->controller_settings.action_set_layers = std::move(action_set_layers);
+    set_handles();
     disabled = !settings->controller_settings.enabled && action_handles.empty();
+    refresh_controllers();
 
-    if (!disabled && !action_handles.empty()) {
-        for (auto &controller : controllers) {
-            if (!controller.second.active_set) {
-                controller.second.activate_action_set(action_handles.begin()->second, controller_maps);
-            }
-        }
+    if (!disabled && !initialized) {
+        return Init(explicitly_call_run_frame);
     }
 
     return !action_handles.empty();
@@ -1070,14 +1227,14 @@ void Steam_Controller::ActivateActionSet( ControllerHandle_t controllerHandle, C
     PRINT_DEBUG("%llu %llu", controllerHandle, actionSetHandle);
     if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
         for (auto & c: controllers) {
-            c.second.activate_action_set(actionSetHandle, controller_maps);
+            c.second.activate_action_set(actionSetHandle, controller_maps, action_set_layer_parents);
         }
     }
 
     auto controller = controllers.find(controllerHandle);
     if (controller == controllers.end()) return;
 
-    controller->second.activate_action_set(actionSetHandle, controller_maps);
+    controller->second.activate_action_set(actionSetHandle, controller_maps, action_set_layer_parents);
 }
 
 ControllerActionSetHandle_t Steam_Controller::GetCurrentActionSet( ControllerHandle_t controllerHandle )
@@ -1093,23 +1250,65 @@ ControllerActionSetHandle_t Steam_Controller::GetCurrentActionSet( ControllerHan
 
 void Steam_Controller::ActivateActionSetLayer( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetLayerHandle )
 {
-    PRINT_DEBUG_TODO();
+    PRINT_DEBUG("%llu %llu", controllerHandle, actionSetLayerHandle);
+    if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
+        for (auto &c : controllers) {
+            c.second.activate_action_set_layer(actionSetLayerHandle, controller_maps, action_set_layer_parents);
+        }
+        return;
+    }
+
+    auto controller = controllers.find(controllerHandle);
+    if (controller == controllers.end()) return;
+    controller->second.activate_action_set_layer(actionSetLayerHandle, controller_maps, action_set_layer_parents);
 }
 
 void Steam_Controller::DeactivateActionSetLayer( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetLayerHandle )
 {
-    PRINT_DEBUG_TODO();
+    PRINT_DEBUG("%llu %llu", controllerHandle, actionSetLayerHandle);
+    if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
+        for (auto &c : controllers) {
+            c.second.deactivate_action_set_layer(actionSetLayerHandle, controller_maps, action_set_layer_parents);
+        }
+        return;
+    }
+
+    auto controller = controllers.find(controllerHandle);
+    if (controller == controllers.end()) return;
+    controller->second.deactivate_action_set_layer(actionSetLayerHandle, controller_maps, action_set_layer_parents);
 }
 
 void Steam_Controller::DeactivateAllActionSetLayers( ControllerHandle_t controllerHandle )
 {
-    PRINT_DEBUG_TODO();
+    PRINT_DEBUG("%llu", controllerHandle);
+    if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
+        for (auto &c : controllers) {
+            c.second.deactivate_all_action_set_layers(controller_maps, action_set_layer_parents);
+        }
+        return;
+    }
+
+    auto controller = controllers.find(controllerHandle);
+    if (controller == controllers.end()) return;
+    controller->second.deactivate_all_action_set_layers(controller_maps, action_set_layer_parents);
 }
 
 int Steam_Controller::GetActiveActionSetLayers( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t *handlesOut )
 {
-    PRINT_DEBUG_TODO();
-    return 0;
+    PRINT_DEBUG("%llu", controllerHandle);
+    auto controller = controllers.find(controllerHandle);
+    if (controller == controllers.end()) return 0;
+    if (!handlesOut) return 0;
+
+    int count = 0;
+    for (auto &active_layer : controller->second.active_layers) {
+        if (count >= STEAM_INPUT_MAX_ACTIVE_LAYERS) break;
+        *handlesOut = active_layer;
+        ++handlesOut;
+        ++count;
+    }
+
+    return count;
 }
 
 
