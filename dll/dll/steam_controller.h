@@ -29,11 +29,34 @@ struct Controller_Map {
 struct Controller_Action {
     ControllerHandle_t controller_handle{};
     struct Controller_Map active_map{};
-    ControllerDigitalActionHandle_t active_set{};
+    ControllerActionSetHandle_t active_set{};
+    std::vector<ControllerActionSetHandle_t> active_layers{};
 
     Controller_Action(ControllerHandle_t controller_handle);
 
-    void activate_action_set(ControllerDigitalActionHandle_t active_set, std::map<ControllerActionSetHandle_t, struct Controller_Map> &controller_maps);
+    void rebuild_active_map(
+        const std::map<ControllerActionSetHandle_t, struct Controller_Map> &controller_maps,
+        const std::map<ControllerActionSetHandle_t, ControllerActionSetHandle_t> &action_set_layer_parents
+    );
+    void activate_action_set(
+        ControllerActionSetHandle_t active_set,
+        const std::map<ControllerActionSetHandle_t, struct Controller_Map> &controller_maps,
+        const std::map<ControllerActionSetHandle_t, ControllerActionSetHandle_t> &action_set_layer_parents
+    );
+    void activate_action_set_layer(
+        ControllerActionSetHandle_t active_layer,
+        const std::map<ControllerActionSetHandle_t, struct Controller_Map> &controller_maps,
+        const std::map<ControllerActionSetHandle_t, ControllerActionSetHandle_t> &action_set_layer_parents
+    );
+    void deactivate_action_set_layer(
+        ControllerActionSetHandle_t active_layer,
+        const std::map<ControllerActionSetHandle_t, struct Controller_Map> &controller_maps,
+        const std::map<ControllerActionSetHandle_t, ControllerActionSetHandle_t> &action_set_layer_parents
+    );
+    void deactivate_all_action_set_layers(
+        const std::map<ControllerActionSetHandle_t, struct Controller_Map> &controller_maps,
+        const std::map<ControllerActionSetHandle_t, ControllerActionSetHandle_t> &action_set_layer_parents
+    );
     std::set<int> button_id(ControllerDigitalActionHandle_t handle);
     std::pair<std::set<int>, enum EInputSourceMode> analog_id(ControllerAnalogActionHandle_t handle);
 };
@@ -95,8 +118,12 @@ public ISteamInput
     std::map<std::string, ControllerActionSetHandle_t> action_handles{};
     std::map<std::string, ControllerDigitalActionHandle_t> digital_action_handles{};
     std::map<std::string, ControllerAnalogActionHandle_t> analog_action_handles{};
+    std::string default_action_set_name{};
+    std::set<std::string> global_active_layer_names{};
+    std::map<ControllerHandle_t, std::set<std::string>> controller_active_layer_names{};
 
     std::map<ControllerActionSetHandle_t, struct Controller_Map> controller_maps{};
+    std::map<ControllerActionSetHandle_t, ControllerActionSetHandle_t> action_set_layer_parents{};
     std::map<ControllerHandle_t, struct Controller_Action> controllers{};
 
     std::map<EInputActionOrigin, std::string> steaminput_glyphs{};
@@ -108,8 +135,16 @@ public ISteamInput
     bool disabled{};
     bool initialized{};
     bool explicitly_call_run_frame{};
+    bool pending_explicitly_call_run_frame{};
 
-    void set_handles(std::map<std::string, std::map<std::string, std::pair<std::set<std::string>, std::string>>> action_sets);
+    void set_handles();
+    ControllerActionSetHandle_t get_default_action_set_handle() const;
+    std::string get_action_set_name_for_handle(ControllerActionSetHandle_t handle) const;
+    void activate_action_layer_name(Controller_Action &controller, const std::string &layer_name);
+    void refresh_controllers(
+        const std::map<ControllerHandle_t, std::string> &previous_action_sets = {},
+        const std::map<ControllerHandle_t, std::vector<std::string>> &previous_action_layers = {}
+    );
 
     void RunCallbacks();
 
