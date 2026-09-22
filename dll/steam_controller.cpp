@@ -165,6 +165,84 @@ static std::string str_to_lower(std::string value)
     return value;
 }
 
+static bool looks_like_json(std::string_view value)
+{
+    for (char c : value) {
+        if (std::isspace(static_cast<unsigned char>(c))) continue;
+        return c == '{' || c == '[';
+    }
+
+    return false;
+}
+
+static VdfEntry json_to_vdf_entry(const nlohmann::json &value)
+{
+    VdfEntry entry{};
+    if (value.is_object()) {
+        for (auto it = value.begin(); it != value.end(); ++it) {
+            if (it->is_array()) {
+                for (auto &item : *it) {
+                    entry.children[it.key()].push_back(json_to_vdf_entry(item));
+                }
+            } else {
+                entry.children[it.key()].push_back(json_to_vdf_entry(*it));
+            }
+        }
+
+        return entry;
+    }
+
+    if (value.is_array()) {
+        for (auto &item : value) {
+            entry.children["item"].push_back(json_to_vdf_entry(item));
+        }
+
+        return entry;
+    }
+
+    entry.is_string = true;
+    if (value.is_string()) {
+        entry.value = value.get<std::string>();
+    } else if (value.is_boolean()) {
+        entry.value = value.get<bool>() ? "1" : "0";
+    } else if (value.is_number_unsigned()) {
+        entry.value = std::to_string(value.get<uint64_t>());
+    } else if (value.is_number_integer()) {
+        entry.value = std::to_string(value.get<int64_t>());
+    } else if (value.is_number_float()) {
+        entry.value = value.dump();
+    }
+
+    return entry;
+}
+
+static bool load_controller_mapping_tree(const std::filesystem::path &config_path, VdfEntry &root)
+{
+    std::ifstream input(config_path);
+    if (!input.is_open()) return false;
+    common_helpers::consume_bom(input);
+
+    std::stringstream buffer{};
+    buffer << input.rdbuf();
+    std::string text = buffer.str();
+
+    const std::string extension = str_to_lower(config_path.extension().string());
+    if (extension == ".json" || looks_like_json(text)) {
+        try {
+            root = json_to_vdf_entry(nlohmann::json::parse(text));
+            return true;
+        } catch (const nlohmann::json::exception &) {
+            if (extension == ".json") {
+                return false;
+            }
+        }
+    }
+
+    VdfParser parser(std::move(text));
+    root = parser.parse();
+    return true;
+}
+
 static const std::vector<VdfEntry>* find_children_ci(const VdfEntry &obj, const std::string_view key)
 {
     for (auto &entry : obj.children) {
@@ -486,14 +564,8 @@ static bool load_controller_mappings_vdf_file(
     std::map<std::string, std::map<std::string, std::pair<std::set<std::string>, std::string>>> &action_sets
 )
 {
-    std::ifstream input(config_path);
-    if (!input.is_open()) return false;
-    common_helpers::consume_bom(input);
-
-    std::stringstream buffer{};
-    buffer << input.rdbuf();
-    VdfParser parser(buffer.str());
-    VdfEntry root = parser.parse();
+    VdfEntry root{};
+    if (!load_controller_mapping_tree(config_path, root)) return false;
 
     const VdfEntry *controller_mappings = find_first_child_ci(root, "controller_mappings");
     if (!controller_mappings) {
@@ -514,14 +586,8 @@ static bool load_action_manifest_vdf(
     std::map<std::string, std::map<std::string, std::pair<std::set<std::string>, std::string>>> &action_sets
 )
 {
-    std::ifstream input(manifest_path);
-    if (!input.is_open()) return false;
-    common_helpers::consume_bom(input);
-
-    std::stringstream buffer{};
-    buffer << input.rdbuf();
-    VdfParser parser(buffer.str());
-    VdfEntry root = parser.parse();
+    VdfEntry root{};
+    if (!load_controller_mapping_tree(manifest_path, root)) return false;
 
     const VdfEntry *manifest_root = find_manifest_root(root);
     if (!manifest_root) return false;
