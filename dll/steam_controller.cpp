@@ -1298,9 +1298,13 @@ void Steam_Controller::DeactivateAllActionSetLayers( ControllerHandle_t controll
 int Steam_Controller::GetActiveActionSetLayers( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t *handlesOut )
 {
     PRINT_DEBUG("%llu", controllerHandle);
-    auto controller = controllers.find(controllerHandle);
-    if (controller == controllers.end()) return 0;
     if (!handlesOut) return 0;
+
+    auto controller = controllers.find(controllerHandle);
+    if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
+        controller = controllers.begin();
+    }
+    if (controller == controllers.end()) return 0;
 
     int count = 0;
     for (auto &active_layer : controller->second.active_layers) {
