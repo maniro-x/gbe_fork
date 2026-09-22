@@ -1114,6 +1114,9 @@ bool Steam_Controller::Init( const char *pchAbsolutePathToControllerConfigVDF )
             settings->controller_settings.action_set_layers = std::move(action_set_layers);
             this->default_action_set_name = std::move(default_action_set_name);
             set_handles();
+            if (this->default_action_set_name.empty()) {
+                this->default_action_set_name = get_action_set_name_for_handle(get_default_action_set_handle());
+            }
             disabled = !settings->controller_settings.enabled && action_handles.empty();
             refresh_controllers(previous_action_sets, previous_action_layers);
         }
@@ -1191,6 +1194,9 @@ bool Steam_Controller::SetInputActionManifestFilePath( const char *pchInputActio
     settings->controller_settings.action_set_layers = std::move(action_set_layers);
     this->default_action_set_name = std::move(default_action_set_name);
     set_handles();
+    if (this->default_action_set_name.empty()) {
+        this->default_action_set_name = get_action_set_name_for_handle(get_default_action_set_handle());
+    }
     disabled = !settings->controller_settings.enabled && action_handles.empty();
     refresh_controllers(previous_action_sets, previous_action_layers);
 
@@ -1353,17 +1359,24 @@ void Steam_Controller::ActivateActionSetLayer( ControllerHandle_t controllerHand
     PRINT_DEBUG("%llu %llu", controllerHandle, actionSetLayerHandle);
     const std::string layer_name = get_action_set_name_for_handle(actionSetLayerHandle);
     if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
-        if (!layer_name.empty()) {
-            global_active_layer_names.insert(layer_name);
-        }
+        auto parent = action_set_layer_parents.find(actionSetLayerHandle);
+        bool activated_any{};
         for (auto &c : controllers) {
+            if (parent != action_set_layer_parents.end() && c.second.active_set == parent->second) {
+                activated_any = true;
+            }
             c.second.activate_action_set_layer(actionSetLayerHandle, controller_maps, action_set_layer_parents);
+        }
+        if (activated_any && !layer_name.empty()) {
+            global_active_layer_names.insert(layer_name);
         }
         return;
     }
 
     auto controller = controllers.find(controllerHandle);
     if (controller == controllers.end()) return;
+    auto parent = action_set_layer_parents.find(actionSetLayerHandle);
+    if (parent == action_set_layer_parents.end() || parent->second != controller->second.active_set) return;
     if (!layer_name.empty()) {
         controller_active_layer_names[controllerHandle].insert(layer_name);
     }
