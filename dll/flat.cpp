@@ -3245,7 +3245,7 @@ STEAMAPI_API ISteamInput *SteamAPI_SteamInput_v007()
 STEAMAPI_API steam_bool SteamAPI_ISteamInput_Init( ISteamInput* self, bool bExplicitlyCallRunFrame )
 {
     PRINT_DEBUG("self=%p explicitly_call_run_frame=%i", self, bExplicitlyCallRunFrame);
-    return (get_steam_client()->steam_controller)->Init(bExplicitlyCallRunFrame);
+    return (get_steam_client()->steam_controller)->Init();
 }
 
 STEAMAPI_API steam_bool SteamAPI_ISteamInput_Shutdown( ISteamInput* self )
@@ -3276,7 +3276,7 @@ STEAMAPI_API steam_bool SteamAPI_ISteamInput_BNewDataAvailable( ISteamInput* sel
 STEAMAPI_API int SteamAPI_ISteamInput_GetConnectedControllers( ISteamInput* self, InputHandle_t * handlesOut )
 {
     PRINT_DEBUG("self=%p handles_out=%p", self, handlesOut);
-    return (get_steam_client()->steam_controller)->GetConnectedControllers(handlesOut);
+    return (get_steam_client()->steam_controller)->GetConnectedControllers(reinterpret_cast<ControllerHandle_t *>(handlesOut));
 }
 
 STEAMAPI_API void SteamAPI_ISteamInput_EnableDeviceCallbacks( ISteamInput* self )
@@ -3534,7 +3534,7 @@ STEAMAPI_API void SteamAPI_ISteamController_RunFrame( ISteamController* self )
 STEAMAPI_API int SteamAPI_ISteamController_GetConnectedControllers( ISteamController* self, ControllerHandle_t * handlesOut )
 {
     PRINT_DEBUG("self=%p handles_out=%p", self, handlesOut);
-    return (get_steam_client()->steam_controller)->GetConnectedControllers(handlesOut);
+    return (get_steam_client()->steam_controller)->GetConnectedControllers(reinterpret_cast<ControllerHandle_t *>(handlesOut));
 }
 
 STEAMAPI_API ControllerActionSetHandle_t SteamAPI_ISteamController_GetActionSetHandle( ISteamController* self, const char * pszActionSetName )

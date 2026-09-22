@@ -812,7 +812,7 @@ static void debug_log_raw_gamepad_state(const char *context, ControllerHandle_t 
     }
 
     previous_snapshots[controllerHandle] = snapshot;
-    PRINT_DEBUG("%s controller %llu raw_state %s", context, controllerHandle, snapshot.c_str());
+    PRINT_DEBUG("%s controller %llu raw_state %s", context, static_cast<unsigned long long>(controllerHandle), snapshot.c_str());
 }
 
 static void debug_log_action_snapshot(
@@ -1113,11 +1113,11 @@ void Steam_Controller::refresh_controllers(
 
         PRINT_DEBUG(
             "refresh_controllers controller %llu previous_set='%s' default_set='%s' selected_set='%s' selected_handle=%llu",
-            controller.first,
+            static_cast<unsigned long long>(controller.first),
             previous_action_set_name.c_str(),
             default_action_set_name.c_str(),
             get_action_set_name_for_handle(action_set_to_activate).c_str(),
-            action_set_to_activate
+            static_cast<unsigned long long>(action_set_to_activate)
         );
 
         controller.second.activate_action_set(action_set_to_activate, controller_maps, action_set_layer_parents);
@@ -1420,11 +1420,6 @@ void Steam_Controller::RunFrame(bool bReservedValue)
     PRINT_DEBUG_ENTRY();
 
     GamepadUpdate();
-    for (int i = 0; i < GAMEPAD_COUNT; ++i) {
-        if (GamepadIsConnected((GAMEPAD_DEVICE)i)) {
-            debug_log_raw_gamepad_state("RunFrame", static_cast<ControllerHandle_t>(i + 1));
-        }
-    }
 }
 
 void Steam_Controller::RunFrame()
@@ -1511,12 +1506,17 @@ ControllerActionSetHandle_t Steam_Controller::GetActionSetHandle( const char *ps
 // your state loops, instead of trying to place it in all of your state transitions.
 void Steam_Controller::ActivateActionSet( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetHandle )
 {
-    PRINT_DEBUG("%llu %llu '%s'", controllerHandle, actionSetHandle, get_action_set_name_for_handle(actionSetHandle).c_str());
+    PRINT_DEBUG(
+        "%llu %llu '%s'",
+        static_cast<unsigned long long>(controllerHandle),
+        static_cast<unsigned long long>(actionSetHandle),
+        get_action_set_name_for_handle(actionSetHandle).c_str()
+    );
     if (controllerHandle == STEAM_CONTROLLER_HANDLE_ALL_CONTROLLERS) {
         for (auto & c: controllers) {
             controller_active_layer_names[c.first].clear();
             c.second.activate_action_set(actionSetHandle, controller_maps, action_set_layer_parents);
-            PRINT_DEBUG("controller %llu active_set now '%s'", c.first, get_action_set_name_for_handle(c.second.active_set).c_str());
+            PRINT_DEBUG("controller %llu active_set now '%s'", static_cast<unsigned long long>(c.first), get_action_set_name_for_handle(c.second.active_set).c_str());
             for (auto &layer_name : global_active_layer_names) {
                 auto layer_handle = action_handles.find(layer_name);
                 if (layer_handle == action_handles.end()) continue;
@@ -1533,7 +1533,7 @@ void Steam_Controller::ActivateActionSet( ControllerHandle_t controllerHandle, C
 
     controller_active_layer_names[controllerHandle].clear();
     controller->second.activate_action_set(actionSetHandle, controller_maps, action_set_layer_parents);
-    PRINT_DEBUG("controller %llu active_set now '%s'", controllerHandle, get_action_set_name_for_handle(controller->second.active_set).c_str());
+    PRINT_DEBUG("controller %llu active_set now '%s'", static_cast<unsigned long long>(controllerHandle), get_action_set_name_for_handle(controller->second.active_set).c_str());
     for (auto &layer_name : global_active_layer_names) {
         auto layer_handle = action_handles.find(layer_name);
         if (layer_handle == action_handles.end()) continue;
@@ -2157,12 +2157,12 @@ int Steam_Controller::GetGamepadIndexForController( ControllerHandle_t ulControl
     PRINT_DEBUG_ENTRY();
     auto controller = controllers.find(ulControllerHandle);
     if (controller == controllers.end()) {
-        PRINT_DEBUG("controller %llu has no gamepad index", ulControllerHandle);
+        PRINT_DEBUG("controller %llu has no gamepad index", static_cast<unsigned long long>(ulControllerHandle));
         return -1;
     }
 
     const int out = static_cast<int>(ulControllerHandle) - 1;
-    PRINT_DEBUG("controller %llu -> gamepad index %i", ulControllerHandle, out);
+    PRINT_DEBUG("controller %llu -> gamepad index %i", static_cast<unsigned long long>(ulControllerHandle), out);
     return out;
 }
 
@@ -2177,7 +2177,7 @@ ControllerHandle_t Steam_Controller::GetControllerForGamepadIndex( int nIndex )
         PRINT_DEBUG("gamepad index %i has no controller handle", nIndex);
         return 0;
     }
-    PRINT_DEBUG("gamepad index %i -> controller handle %llu", nIndex, out);
+    PRINT_DEBUG("gamepad index %i -> controller handle %llu", nIndex, static_cast<unsigned long long>(out));
     return out;
 }
 
