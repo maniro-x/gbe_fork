@@ -803,7 +803,10 @@ static std::string debug_build_raw_gamepad_snapshot(GAMEPAD_DEVICE device)
 static void debug_log_raw_gamepad_state(const char *context, ControllerHandle_t controllerHandle)
 {
     if (controllerHandle == 0) return;
-    GAMEPAD_DEVICE device = (GAMEPAD_DEVICE)(controllerHandle - 1);
+    const int gamepad_index = static_cast<int>(controllerHandle) - 1;
+    if (gamepad_index < 0 || gamepad_index >= GAMEPAD_COUNT) return;
+    GAMEPAD_DEVICE device = (GAMEPAD_DEVICE)gamepad_index;
+    if (!GamepadIsConnected(device)) return;
     const std::string snapshot = debug_build_raw_gamepad_snapshot(device);
     static std::map<ControllerHandle_t, std::string> previous_snapshots{};
     auto previous = previous_snapshots.find(controllerHandle);
