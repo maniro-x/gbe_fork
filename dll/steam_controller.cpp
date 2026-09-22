@@ -1026,7 +1026,11 @@ bool Steam_Controller::Init(bool bExplicitlyCallRunFrame)
 {
     PRINT_DEBUG("%u", bExplicitlyCallRunFrame);
     std::lock_guard<std::recursive_mutex> lock(global_mutex);
-    if (disabled || initialized) {
+    if (initialized) {
+        return true;
+    }
+
+    if (disabled) {
         explicitly_call_run_frame = bExplicitlyCallRunFrame;
         return true;
     }
@@ -1076,7 +1080,9 @@ bool Steam_Controller::Init( const char *pchAbsolutePathToControllerConfigVDF )
             settings->controller_settings.action_sets = std::move(action_sets);
             settings->controller_settings.action_set_layer_parents = std::move(action_set_layer_parents);
             settings->controller_settings.action_set_layers = std::move(action_set_layers);
-            this->default_action_set_name = std::move(default_action_set_name);
+            if (!default_action_set_name.empty()) {
+                this->default_action_set_name = std::move(default_action_set_name);
+            }
             set_handles();
             disabled = !settings->controller_settings.enabled && action_handles.empty();
             refresh_controllers(previous_action_sets);
@@ -1148,7 +1154,9 @@ bool Steam_Controller::SetInputActionManifestFilePath( const char *pchInputActio
     settings->controller_settings.action_sets = std::move(action_sets);
     settings->controller_settings.action_set_layer_parents = std::move(action_set_layer_parents);
     settings->controller_settings.action_set_layers = std::move(action_set_layers);
-    this->default_action_set_name = std::move(default_action_set_name);
+    if (!default_action_set_name.empty()) {
+        this->default_action_set_name = std::move(default_action_set_name);
+    }
     set_handles();
     disabled = !settings->controller_settings.enabled && action_handles.empty();
     refresh_controllers(previous_action_sets);
