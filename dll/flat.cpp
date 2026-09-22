@@ -3245,8 +3245,7 @@ STEAMAPI_API ISteamInput *SteamAPI_SteamInput_v007()
 STEAMAPI_API steam_bool SteamAPI_ISteamInput_Init( ISteamInput* self, bool bExplicitlyCallRunFrame )
 {
     PRINT_DEBUG("self=%p explicitly_call_run_frame=%i", self, bExplicitlyCallRunFrame);
-    //TODO: do something with bExplicitlyCallRunFrame
-    return (get_steam_client()->steam_controller)->Init();
+    return (get_steam_client()->steam_controller)->Init(bExplicitlyCallRunFrame);
 }
 
 STEAMAPI_API steam_bool SteamAPI_ISteamInput_Shutdown( ISteamInput* self )
